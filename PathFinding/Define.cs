@@ -1,24 +1,25 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace PathFinding
 {
-    static class Grid
+    static class GridStandard
     {
         public const int height = 50;
         public const int width = 60;
-        public const int cellSize = 70;   // 각 셀의 크기
+        public const int cellSize = 150;   // 각 셀의 크기
         public const int buttonXPaddingSize = 200;
 
         public static bool IsRightPos(int xPos, int yPos)
         {
-            if (xPos < 0 || xPos >= Grid.width)
+            if (xPos < 0 || xPos >= GridStandard.width)
                 return false;
 
-            if (yPos < 0 || yPos >= Grid.height)
+            if (yPos < 0 || yPos >= GridStandard.height)
                 return false;
 
             return true;
@@ -64,10 +65,25 @@ namespace PathFinding
         DIR_MAX,     // 
     };
 
-    enum eMode
+    class Grid
     {
-        SETTING = 0,// 기본 모드
-        BLOCKING, // 벽을 설치하는 모드.
-        MODE_MAX = 2,
-    };
+        public EnumColor enumColor = EnumColor.NO_USE;
+
+        public PathFindNode? pathFindNode = null;
+
+        public EnumColor Color
+        {
+            get => enumColor;
+            set => enumColor = value; 
+        }
+
+        public PathFindNode? PathFindNode
+        {
+            get => pathFindNode;
+            set => pathFindNode = value;
+        }
+
+            
+    }
+
 }

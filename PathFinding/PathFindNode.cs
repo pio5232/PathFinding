@@ -11,10 +11,8 @@ namespace PathFinding
 {
     class PathFinder
     {
-        
         PathFindNode startNode = new PathFindNode();
         PathFindNode endNode = new PathFindNode();
-
         public PathFindNode StartNode => startNode;
         public PathFindNode EndNode => endNode;
 
@@ -27,7 +25,6 @@ namespace PathFinding
 
         // CloseList 존재해야하지만, 현재 grid의 색상을 통해 CloseList로 검사하는 역할을 할 수 있음.
 
-        
         public void InsertSetMember(int xPos, int yPos)
         {
             Debug.Assert(closedSet.Contains((xPos,yPos)) == false);
@@ -72,7 +69,7 @@ namespace PathFinding
 
             return true;
         }
-        public bool Navigate(Queue<ValueTuple<int, int, EnumColor>> colorQ)
+        public bool Navigate(Queue<(PathFindNode, EnumColor)> colorQ)
         {
             Debug.Assert(openList.Count > 0);
 
@@ -85,8 +82,7 @@ namespace PathFinding
             openListDataSet.Remove((node.xPos, node.yPos));
             closedSet.Add((node.xPos, node.yPos));
 
-            ValueTuple<int, int, EnumColor> vtPos = (node.yPos, node.xPos, EnumColor.END_SEARCH);
-            colorQ.Enqueue(vtPos);
+            colorQ.Enqueue((node, EnumColor.END_SEARCH));
             // 목적지 확인
             // 도착한 상태면 부모노드를 타고 가서 색을 바꿔준다.
             if (node.xPos == endNode.xPos && node.yPos == endNode.yPos)
@@ -94,18 +90,12 @@ namespace PathFinding
                 // 출발지,목적지 제외 색바꿔야함
                 while (node.parent_node != null)
                 {
-                    vtPos.Item1 = node.yPos;
-                    vtPos.Item2 = node.xPos;
-                    vtPos.Item3 = EnumColor.PATH;
-
-                    colorQ.Enqueue(vtPos);
+                    colorQ.Enqueue((node, EnumColor.PATH));
                     node = node.parent_node;
                 }
-                ValueTuple<int, int, EnumColor> vtStart = (startNode.yPos, startNode.xPos, EnumColor.START_POINT);
-                ValueTuple<int, int, EnumColor> vtEnd = (endNode.yPos, endNode.xPos, EnumColor.END_POINT);
-
-                colorQ.Enqueue(vtStart);
-                colorQ.Enqueue(vtEnd);
+                
+                colorQ.Enqueue((startNode,EnumColor.START_POINT));
+                colorQ.Enqueue((endNode,EnumColor.END_POINT));
 
                 return true;
             }
@@ -117,7 +107,7 @@ namespace PathFinding
             return false;
         }
 
-        void RegistNode(PathFindNode parentNode, EnumDir dir, Queue<ValueTuple<int, int, EnumColor>> colorQ)
+        void RegistNode(PathFindNode parentNode, EnumDir dir, Queue<(PathFindNode, EnumColor)> colorQ)
         {
             int intendedPosX = parentNode.xPos;
             int intendedPosY = parentNode.yPos;
@@ -136,7 +126,7 @@ namespace PathFinding
             }
 
             // pos Check
-            if (!Grid.IsRightPos(intendedPosX, intendedPosY))
+            if (!GridStandard.IsRightPos(intendedPosX, intendedPosY))
                 return;
 
             // 갔던 곳 또는 벽
@@ -162,7 +152,6 @@ namespace PathFinding
                         item.heuristic_g = tempG;
                         item.heuristic_h = tempH;
                         item.heuristic_f = tempF;
-
                     }
                 }
                 return;
@@ -183,7 +172,7 @@ namespace PathFinding
             openListDataSet.Add((newNode.xPos, newNode.yPos), newNode);
             openList.Add(newNode);
 
-            colorQ.Enqueue((newNode.yPos, newNode.xPos, EnumColor.INTENDED));
+            colorQ.Enqueue((newNode, EnumColor.INTENDED));
         }   
     }
     class PathFindNode 

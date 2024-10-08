@@ -34,12 +34,15 @@
             // 
             // button1
             // 
-            button1.Location = new Point(12, 12);
+            button1.BackColor = Color.White;
+            button1.Location = new Point(12, 372);
             button1.Name = "button1";
             button1.Size = new Size(161, 46);
             button1.TabIndex = 1;
-            button1.Text = "button1";
-            button1.UseVisualStyleBackColor = true;
+            button1.TabStop = false;
+            button1.Text = "Move Off";
+            button1.UseVisualStyleBackColor = false;
+            button1.Click += button1_Click;
             // 
             // textBox1
             // 
