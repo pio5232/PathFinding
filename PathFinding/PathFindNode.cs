@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Numerics;
+using System.Diagnostics;
 namespace PathFinding
 {
     class PathFinder
@@ -16,17 +17,27 @@ namespace PathFinding
 
         public PathFindNode StartNode => startNode;
         public PathFindNode EndNode => endNode;
-        PriorityQueue<PathFindNode, int> openList = new PriorityQueue<PathFindNode, int>(300, new HeuristicComparer());
-        HashSet<(int, int)> closedSet = new (3050);
+
+        //PriorityQueue<PathFindNode, int> openList = new PriorityQueue<PathFindNode, int>(300, new HeuristicComparer());
+        //HashSet<(int, int)> openListDataSet = new(200); // 검색 속도를 빠르게 하기 위해서 O(1) 테이블 사용.
+        Dictionary<(int, int), PathFindNode> openListDataSet = new(3000); // 검색 속도를 빠르게 하기 위해서 O(1) 테이블 사용.
+        List<PathFindNode> openList = new List<PathFindNode>(3050);
+
+        HashSet<(int, int)> closedSet = new (3050); // (xPos, yPos) << 내가 (y,x)의 형태로 사용하는데, 여기는 반대로 저장함.
+
         // CloseList 존재해야하지만, 현재 grid의 색상을 통해 CloseList로 검사하는 역할을 할 수 있음.
-        public void Insert(in PathFindNode node)
+
+        
+        public void InsertSetMember(int xPos, int yPos)
         {
-            openList.Enqueue(node, node.heuristic_f);
+            Debug.Assert(closedSet.Contains((xPos,yPos)) == false);
+            closedSet.Add((xPos,yPos));
         }
 
-        public PathFindNode Pop()
+        public void DeleteSetMember(int xPos, int yPos)
         {
-            return openList.Dequeue();
+            Debug.Assert(closedSet.Contains((xPos, yPos)));
+            closedSet.Remove((xPos, yPos));
         }
 
         public bool IsEmpty()
@@ -36,7 +47,10 @@ namespace PathFinding
 
         public void Initialize()
         {
+            openListDataSet.Clear();
+
             openList.Clear();
+            closedSet.Clear();
 
             startNode.Initialize();
             endNode.Initialize();
@@ -49,22 +63,26 @@ namespace PathFinding
 
             if (openList.Count == 0)
             {
-                startNode.heuristic_h = Math.Abs(endNode.yPos - startNode.yPos) + Math.Abs(endNode.xPos - startNode.xPos) *(int)DirWeight.DEFAULT_WEIGHT;
+                startNode.heuristic_h = (Math.Abs(endNode.yPos - startNode.yPos) + Math.Abs(endNode.xPos - startNode.xPos)) *(int)DirWeight.DEFAULT_WEIGHT;
                 startNode.heuristic_f = startNode.heuristic_h;
-                openList.Enqueue(startNode, startNode.heuristic_f);
+                //openList.Enqueue(startNode, startNode.heuristic_f);
+                openList.Add(startNode);
+                openListDataSet.Add((startNode.xPos, startNode.yPos), startNode);
             }
 
             return true;
         }
         public bool Navigate(Queue<ValueTuple<int, int, EnumColor>> colorQ)
         {
-            PathFindNode node = openList.Dequeue();
+            Debug.Assert(openList.Count > 0);
 
-            // List를 사용할 때 Regist에서 갈 곳보다 좋다면 덮어썼지만, PQ라서 이미 갔던 곳에 대한 정보가 뽑혀서 나올 수 있음
-            // 그래서 그것에 대한 체크.
-            if (closedSet.Contains((node.xPos, node.yPos)))
-                return false;
+            openList.Sort((PathFindNode first, PathFindNode second) => { return first.heuristic_f - second.heuristic_f; });
 
+            PathFindNode node = openList[0];
+            openList.RemoveAt(0);
+
+            // closeSet에 존재하지 않는데 openList에 있다 == 무조건 openListDataSet에 존재.
+            openListDataSet.Remove((node.xPos, node.yPos));
             closedSet.Add((node.xPos, node.yPos));
 
             ValueTuple<int, int, EnumColor> vtPos = (node.yPos, node.xPos, EnumColor.END_SEARCH);
@@ -121,21 +139,51 @@ namespace PathFinding
             if (!Grid.IsRightPos(intendedPosX, intendedPosY))
                 return;
 
-            // 갔던 곳.
+            // 갔던 곳 또는 벽
             if (closedSet.Contains((intendedPosX, intendedPosY)))
                 return;
 
+            // 중복 체크. openList에 등록이 되었지만 지금 경로가 더 좋다면 openList에 바꿔치기한다.
+            int tempG = parentNode.heuristic_g + ((int)dir % 2 == 0 ? (int)DirWeight.DIAGONAL : (int)DirWeight.CROSS);
+            int tempH = (Math.Abs(endNode.yPos - intendedPosY) + Math.Abs(endNode.xPos - intendedPosX)) * (int)DirWeight.DEFAULT_WEIGHT;
+            int tempF = tempG + tempH;
+
+
+            if (openListDataSet.ContainsKey((intendedPosX, intendedPosY)))
+            {
+                PathFindNode item = openListDataSet[(intendedPosX, intendedPosY)];
+                
+                if (item.yPos == intendedPosY && item.xPos == intendedPosX)
+                {
+                    if (item.heuristic_g > tempG)
+                    {
+                        item.parent_node = parentNode;
+
+                        item.heuristic_g = tempG;
+                        item.heuristic_h = tempH;
+                        item.heuristic_f = tempF;
+
+                    }
+                }
+                return;
+            }
+
+            // 그것도 아니라면. 새로운 노드 생성 후 openList에 등록한다.
             PathFindNode newNode = new PathFindNode();
             newNode.parent_node = parentNode;
             newNode.xPos = intendedPosX;
             newNode.yPos = intendedPosY;
 
             // manhatan
-            newNode.heuristic_g = parentNode.heuristic_g + ((int)dir % 2 == 0 ? (int)DirWeight.DIAGONAL : (int)DirWeight.CROSS);
-            newNode.heuristic_h = Math.Abs(endNode.yPos - newNode.yPos) + Math.Abs(endNode.xPos - newNode.xPos) * (int)DirWeight.DEFAULT_WEIGHT;
-            newNode.heuristic_f = newNode.heuristic_g + newNode.heuristic_h;
+            newNode.heuristic_g = tempG;
+            newNode.heuristic_h = tempH;
+            newNode.heuristic_f = tempF;
 
-            openList.Enqueue(newNode, newNode.heuristic_f);
+            //openList.Enqueue(newNode, newNode.heuristic_f);
+            openListDataSet.Add((newNode.xPos, newNode.yPos), newNode);
+            openList.Add(newNode);
+
+            colorQ.Enqueue((newNode.yPos, newNode.xPos, EnumColor.INTENDED));
         }   
     }
     class PathFindNode 

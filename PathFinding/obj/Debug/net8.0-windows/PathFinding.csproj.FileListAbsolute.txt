@@ -14,3 +14,4 @@ C:\Users\정후\source\repos\PathFinding\PathFinding\obj\Debug\net8.0-windows\re
 C:\Users\정후\source\repos\PathFinding\PathFinding\obj\Debug\net8.0-windows\PathFinding.pdb
 C:\Users\정후\source\repos\PathFinding\PathFinding\obj\Debug\net8.0-windows\PathFinding.genruntimeconfig.cache
 C:\Users\정후\source\repos\PathFinding\PathFinding\obj\Debug\net8.0-windows\ref\PathFinding.dll
+C:\Users\정후\source\repos\PathFinding\PathFinding\obj\Debug\net8.0-windows\PathFinding.sourcelink.json

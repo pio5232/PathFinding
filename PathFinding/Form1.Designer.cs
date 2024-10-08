@@ -29,6 +29,7 @@
         private void InitializeComponent()
         {
             button1 = new Button();
+            textBox1 = new TextBox();
             SuspendLayout();
             // 
             // button1
@@ -40,11 +41,20 @@
             button1.Text = "button1";
             button1.UseVisualStyleBackColor = true;
             // 
+            // textBox1
+            // 
+            textBox1.Location = new Point(12, 102);
+            textBox1.Multiline = true;
+            textBox1.Name = "textBox1";
+            textBox1.Size = new Size(161, 223);
+            textBox1.TabIndex = 2;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(14F, 32F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(2298, 1221);
+            Controls.Add(textBox1);
             Controls.Add(button1);
             KeyPreview = true;
             Name = "Form1";
@@ -58,9 +68,11 @@
             MouseMove += Form1_MouseMove;
             MouseUp += Form1_MouseUp;
             ResumeLayout(false);
+            PerformLayout();
         }
 
         #endregion
         private Button button1;
+        private TextBox textBox1;
     }
 }

@@ -49,7 +49,7 @@ namespace PathFinding
 
 
             naviTimer.Tick += new EventHandler(Navigate);
-            naviTimer.Interval = 50;
+            naviTimer.Interval = 10;
 
             MouseWheel += new MouseEventHandler(MouseWheelEvent);
         }
@@ -66,6 +66,7 @@ namespace PathFinding
             naviQ.Clear();
             bool res = pathFinder.Navigate(naviQ);
 
+            textBox1.Text = naviQ.Count.ToString();
             while(naviQ.Count > 0)
             {
                 var vTuple = naviQ.Dequeue();
@@ -189,6 +190,22 @@ namespace PathFinding
                     bDrag = true;
                     bErase = gridColor[yPos, xPos] != EnumColor.NO_USE;
 
+                    if (!Grid.IsRightPos(xPos, yPos))
+                        return;
+
+                    if (gridColor[yPos, xPos] != EnumColor.OBSTACLE && gridColor[yPos, xPos] != EnumColor.NO_USE)
+                        return;
+
+                    if (!bErase)
+                    {
+                        gridColor[yPos, xPos] = EnumColor.OBSTACLE;
+                        pathFinder.InsertSetMember(xPos, yPos);
+                    }
+                    else
+                    {
+                        gridColor[yPos, xPos] = EnumColor.NO_USE;
+                        pathFinder.DeleteSetMember(xPos, yPos);
+                    }
                 }
             }
             Invalidate();
@@ -206,14 +223,28 @@ namespace PathFinding
             if (!Grid.IsRightPos(xPos, yPos))
                 return;
 
-            if (gridColor[yPos, xPos] != EnumColor.OBSTACLE && gridColor[yPos, xPos] != EnumColor.NO_USE)
+            bool isObstacle = gridColor[yPos, xPos] == EnumColor.OBSTACLE;
+            bool isNoUse = gridColor[yPos, xPos] == EnumColor.NO_USE;
+
+            if (!isObstacle && !isNoUse)
                 return;
 
             if (!bErase)
-                gridColor[yPos, xPos] = EnumColor.OBSTACLE;
-            else
-                gridColor[yPos, xPos] = EnumColor.NO_USE;
+            {
+                if (isObstacle)
+                    return;
 
+                gridColor[yPos, xPos] = EnumColor.OBSTACLE;
+                pathFinder.InsertSetMember(xPos, yPos);
+            }
+            else
+            {
+                if (isNoUse)
+                    return;
+
+                gridColor[yPos, xPos] = EnumColor.NO_USE;
+                pathFinder.DeleteSetMember(xPos, yPos);
+            }
             Invalidate();
         }
 
@@ -247,13 +278,15 @@ namespace PathFinding
                 if (naviTimer.Enabled)
                     naviTimer.Stop();
 
-                if(pathFinder.StartNode.isUsable)
-                gridColor[pathFinder.StartNode.yPos, pathFinder.StartNode.xPos] = EnumColor.NO_USE; 
-                
-                if(pathFinder.EndNode.isUsable)
-                gridColor[pathFinder.EndNode.yPos, pathFinder.EndNode.xPos] = EnumColor.NO_USE; 
                 pathFinder.Initialize();
 
+                for(int i=0; i<gridColor.GetLength(0); i++)
+                {
+                    for(int j=0;j<gridColor.GetLength(1);j++)
+                    {
+                        gridColor[i,j] = EnumColor.NO_USE;
+                    }
+                }
                 Invalidate();
             }
         }
