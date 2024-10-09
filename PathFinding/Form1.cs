@@ -65,6 +65,20 @@ namespace PathFinding
             naviTimer.Interval = 10;
 
             MouseWheel += new MouseEventHandler(MouseWheelEvent);
+
+            StringBuilder strBuild = new StringBuilder();
+            strBuild.AppendLine("확대 / 축소 : Mouse Wheel");
+            strBuild.AppendLine("ESC : 리셋");
+            strBuild.AppendLine("------ Mode 1 ------");
+            strBuild.AppendLine("좌 클릭 : 출발 지점 생성 / 제거");
+            strBuild.AppendLine("우 클릭 : 도착 지점 생성 / 제거");
+            strBuild.AppendLine("------ Mode 2 ------");
+            strBuild.AppendLine("좌 클릭 / 좌 클릭 후 드래그 : 벽 생성");
+            strBuild.AppendLine("이동을 하고 싶을 땐 Move 버튼을 활성화.");
+            manualTb.Text = strBuild.ToString();
+
+            modeTb.Text = "Mode 1";
+
         }
         private void MouseWheelEvent(object? sender, MouseEventArgs e)
         {
@@ -190,10 +204,15 @@ namespace PathFinding
             if (e.Button == MouseButtons.Middle)
             {
                 if (mode == EnumMode.SETTING)
+                {
                     mode = EnumMode.BLOCKING;
+                    modeTb.Text = "Mode 1";
+                }
                 else
+                {
                     mode = EnumMode.SETTING;
-
+                    modeTb.Text = "Mode 2";
+                }
                 return;
             }
 

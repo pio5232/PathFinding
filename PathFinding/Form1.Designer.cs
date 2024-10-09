@@ -30,12 +30,14 @@
         {
             button1 = new Button();
             textBox1 = new TextBox();
+            manualTb = new TextBox();
+            modeTb = new TextBox();
             SuspendLayout();
             // 
             // button1
             // 
             button1.BackColor = Color.White;
-            button1.Location = new Point(12, 372);
+            button1.Location = new Point(12, 179);
             button1.Name = "button1";
             button1.Size = new Size(161, 46);
             button1.TabIndex = 1;
@@ -49,14 +51,36 @@
             textBox1.Location = new Point(12, 102);
             textBox1.Multiline = true;
             textBox1.Name = "textBox1";
-            textBox1.Size = new Size(161, 223);
+            textBox1.Size = new Size(161, 57);
             textBox1.TabIndex = 2;
+            // 
+            // manualTb
+            // 
+            manualTb.Enabled = false;
+            manualTb.Font = new Font("맑은 고딕", 5F);
+            manualTb.Location = new Point(12, 319);
+            manualTb.Multiline = true;
+            manualTb.Name = "manualTb";
+            manualTb.Size = new Size(161, 329);
+            manualTb.TabIndex = 3;
+            manualTb.TabStop = false;
+            // 
+            // modeTb
+            // 
+            modeTb.Enabled = false;
+            modeTb.Location = new Point(12, 231);
+            modeTb.Multiline = true;
+            modeTb.Name = "modeTb";
+            modeTb.Size = new Size(161, 82);
+            modeTb.TabIndex = 4;
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(14F, 32F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(2298, 1221);
+            Controls.Add(modeTb);
+            Controls.Add(manualTb);
             Controls.Add(textBox1);
             Controls.Add(button1);
             KeyPreview = true;
@@ -77,5 +101,7 @@
         #endregion
         private Button button1;
         private TextBox textBox1;
+        private TextBox manualTb;
+        private TextBox modeTb;
     }
 }
