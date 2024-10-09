@@ -60,7 +60,15 @@ namespace PathFinding
 
             if (openList.Count == 0)
             {
-                startNode.heuristic_h = (Math.Abs(endNode.yPos - startNode.yPos) + Math.Abs(endNode.xPos - startNode.xPos)) *(int)DirWeight.DEFAULT_WEIGHT;
+                int absY = Math.Abs(endNode.yPos - startNode.yPos);
+                int absX = Math.Abs(endNode.xPos - startNode.xPos);
+
+                int large = absX > absY ? absX : absY;
+                int small = absX < absY ? absX : absY;
+
+                // large - small => 대각 횟수
+                // large - small => Cross 횟수
+                startNode.heuristic_h = small * (int)DirWeight.DIAGONAL + (large - small) * (int)DirWeight.CROSS;
                 startNode.heuristic_f = startNode.heuristic_h;
                 //openList.Enqueue(startNode, startNode.heuristic_f);
                 openList.Add(startNode);
@@ -73,7 +81,12 @@ namespace PathFinding
         {
             Debug.Assert(openList.Count > 0);
 
-            openList.Sort((PathFindNode first, PathFindNode second) => { return first.heuristic_f - second.heuristic_f; });
+            openList.Sort((PathFindNode first, PathFindNode second) => {
+                if(first.heuristic_f != second.heuristic_f)
+                return first.heuristic_f - second.heuristic_f;
+
+                return first.heuristic_h - second.heuristic_h;
+            });
 
             PathFindNode node = openList[0];
             openList.RemoveAt(0);
@@ -135,7 +148,13 @@ namespace PathFinding
 
             // 중복 체크. openList에 등록이 되었지만 지금 경로가 더 좋다면 openList에 바꿔치기한다.
             int tempG = parentNode.heuristic_g + ((int)dir % 2 == 0 ? (int)DirWeight.DIAGONAL : (int)DirWeight.CROSS);
-            int tempH = (Math.Abs(endNode.yPos - intendedPosY) + Math.Abs(endNode.xPos - intendedPosX)) * (int)DirWeight.DEFAULT_WEIGHT;
+
+            int absX = Math.Abs(endNode.xPos - intendedPosX);
+            int absY = Math.Abs(endNode.yPos - intendedPosY);
+            int large = absX > absY ? absX : absY;
+            int small = absX < absY ? absX : absY;
+
+            int tempH = small * (int)DirWeight.DIAGONAL + (large-small) * (int)DirWeight.CROSS ;
             int tempF = tempG + tempH;
 
 
@@ -163,7 +182,6 @@ namespace PathFinding
             newNode.xPos = intendedPosX;
             newNode.yPos = intendedPosY;
 
-            // manhatan
             newNode.heuristic_g = tempG;
             newNode.heuristic_h = tempH;
             newNode.heuristic_f = tempF;
