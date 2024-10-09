@@ -30,7 +30,8 @@ namespace PathFinding
         CROSS = 10, // 상하좌우
         DIAGONAL = 14, // 대각
         
-        DEFAULT_WEIGHT = 10, // 기본 이동은 10의 값을 가진다 라고 설정.
+        H_WEIGHT = 3, // 기본 이동은 10의 값을 가진다 라고 설정.
+        G_WEIGHT = 1,
     }
     enum EnumMode
     {

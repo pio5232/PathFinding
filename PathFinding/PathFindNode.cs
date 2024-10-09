@@ -16,10 +16,10 @@ namespace PathFinding
         public PathFindNode StartNode => startNode;
         public PathFindNode EndNode => endNode;
 
-        //PriorityQueue<PathFindNode, int> openList = new PriorityQueue<PathFindNode, int>(300, new HeuristicComparer());
+        PriorityQueue<PathFindNode, int> openList = new PriorityQueue<PathFindNode, int>(300, new HeuristicComparer());
         //HashSet<(int, int)> openListDataSet = new(200); // 검색 속도를 빠르게 하기 위해서 O(1) 테이블 사용.
         Dictionary<(int, int), PathFindNode> openListDataSet = new(3000); // 검색 속도를 빠르게 하기 위해서 O(1) 테이블 사용.
-        List<PathFindNode> openList = new List<PathFindNode>(3050);
+        //List<PathFindNode> openList = new List<PathFindNode>(3050);
 
         HashSet<(int, int)> closedSet = new (3050); // (xPos, yPos) << 내가 (y,x)의 형태로 사용하는데, 여기는 반대로 저장함.
 
@@ -69,9 +69,11 @@ namespace PathFinding
                 // large - small => 대각 횟수
                 // large - small => Cross 횟수
                 startNode.heuristic_h = small * (int)DirWeight.DIAGONAL + (large - small) * (int)DirWeight.CROSS;
+
+                startNode.heuristic_h *= (int)DirWeight.H_WEIGHT;
                 startNode.heuristic_f = startNode.heuristic_h;
-                //openList.Enqueue(startNode, startNode.heuristic_f);
-                openList.Add(startNode);
+                openList.Enqueue(startNode, startNode.heuristic_f);
+                //openList.Add(startNode);
                 openListDataSet.Add((startNode.xPos, startNode.yPos), startNode);
             }
 
@@ -81,15 +83,16 @@ namespace PathFinding
         {
             Debug.Assert(openList.Count > 0);
 
-            openList.Sort((PathFindNode first, PathFindNode second) => {
-                if(first.heuristic_f != second.heuristic_f)
-                return first.heuristic_f - second.heuristic_f;
+            //openList.Sort((PathFindNode first, PathFindNode second) => {
+            //    if(first.heuristic_f != second.heuristic_f)
+            //    return first.heuristic_f - second.heuristic_f;
 
-                return first.heuristic_h - second.heuristic_h;
-            });
+            //    return first.heuristic_h - second.heuristic_h;
+            //});
 
-            PathFindNode node = openList[0];
-            openList.RemoveAt(0);
+            PathFindNode node = openList.Dequeue();
+            //openList[0];
+            //openList.RemoveAt(0);
 
             // closeSet에 존재하지 않는데 openList에 있다 == 무조건 openListDataSet에 존재.
             openListDataSet.Remove((node.xPos, node.yPos));
@@ -148,13 +151,17 @@ namespace PathFinding
 
             // 중복 체크. openList에 등록이 되었지만 지금 경로가 더 좋다면 openList에 바꿔치기한다.
             int tempG = parentNode.heuristic_g + ((int)dir % 2 == 0 ? (int)DirWeight.DIAGONAL : (int)DirWeight.CROSS);
-
+           
             int absX = Math.Abs(endNode.xPos - intendedPosX);
             int absY = Math.Abs(endNode.yPos - intendedPosY);
             int large = absX > absY ? absX : absY;
             int small = absX < absY ? absX : absY;
 
             int tempH = small * (int)DirWeight.DIAGONAL + (large-small) * (int)DirWeight.CROSS ;
+
+            tempG *= (int)DirWeight.G_WEIGHT;
+            tempH *= (int)DirWeight.H_WEIGHT;
+
             int tempF = tempG + tempH;
 
 
@@ -186,9 +193,9 @@ namespace PathFinding
             newNode.heuristic_h = tempH;
             newNode.heuristic_f = tempF;
 
-            //openList.Enqueue(newNode, newNode.heuristic_f);
+            openList.Enqueue(newNode, newNode.heuristic_f);
             openListDataSet.Add((newNode.xPos, newNode.yPos), newNode);
-            openList.Add(newNode);
+            //openList.Add(newNode);
 
             colorQ.Enqueue((newNode, EnumColor.INTENDED));
         }   

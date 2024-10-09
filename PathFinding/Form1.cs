@@ -369,6 +369,32 @@ namespace PathFinding
                     naviTimer.Start();
                 }
             }
+            else if(e.KeyCode == Keys.V)
+            {
+                if (bEnd || !pathFinder.CanNavi())
+                    return;
+
+                while (true)
+                {
+                    bool res = pathFinder.Navigate(naviQ);
+
+                    while (naviQ.Count > 0)
+                    {
+                        var vTuple = naviQ.Dequeue();
+
+                        // == gridColor[yPos, xPos] = color;
+                        grid[vTuple.Item1.yPos, vTuple.Item1.xPos].Color = vTuple.Item2;
+                        grid[vTuple.Item1.yPos, vTuple.Item1.xPos].pathFindNode = vTuple.Item1;
+                    }
+                    naviQ.Clear();
+
+                    if (res)
+                        break;
+                }
+                bEnd = true;
+                Invalidate();
+
+            }
             // ESC, Delete
             else if (e.KeyCode == Keys.Escape)
             {
