@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PathFinding")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+20b0b097571d09895a7ca45c18129a9ab8e9d6f8")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4e4f1f6d6660c664e442a871bb5a64763302a76c")]
 [assembly: System.Reflection.AssemblyProductAttribute("PathFinding")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PathFinding")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

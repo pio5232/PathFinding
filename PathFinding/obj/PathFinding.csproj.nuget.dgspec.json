@@ -1,20 +1,24 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\정후\\source\\repos\\PathFinding\\PathFinding\\PathFinding.csproj": {}
+    "E:\\PathFinding\\PathFinding\\PathFinding.csproj": {}
   },
   "projects": {
-    "C:\\Users\\정후\\source\\repos\\PathFinding\\PathFinding\\PathFinding.csproj": {
+    "E:\\PathFinding\\PathFinding\\PathFinding.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\정후\\source\\repos\\PathFinding\\PathFinding\\PathFinding.csproj",
+        "projectUniqueName": "E:\\PathFinding\\PathFinding\\PathFinding.csproj",
         "projectName": "PathFinding",
-        "projectPath": "C:\\Users\\정후\\source\\repos\\PathFinding\\PathFinding\\PathFinding.csproj",
-        "packagesPath": "C:\\Users\\정후\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\정후\\source\\repos\\PathFinding\\PathFinding\\obj\\",
+        "projectPath": "E:\\PathFinding\\PathFinding\\PathFinding.csproj",
+        "packagesPath": "C:\\Users\\Lee\\.nuget\\packages\\",
+        "outputPath": "E:\\PathFinding\\PathFinding\\obj\\",
         "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
         "configFilePaths": [
-          "C:\\Users\\정후\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\Lee\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
@@ -34,6 +38,11 @@
           "warnAsError": [
             "NU1605"
           ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
         }
       },
       "frameworks": {
@@ -58,7 +67,7 @@
               "privateAssets": "none"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.100/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.303/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

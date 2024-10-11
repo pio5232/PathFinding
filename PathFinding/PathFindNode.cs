@@ -152,6 +152,7 @@ namespace PathFinding
 
             switch (dir)
             {
+                case EnumDir.UU: intendedPosY--; break;
                 case EnumDir.RU: intendedPosY--; intendedPosX++; break;
                 case EnumDir.RR: intendedPosX++; break;
                 case EnumDir.RD: intendedPosY++; intendedPosX++; break;
@@ -159,7 +160,6 @@ namespace PathFinding
                 case EnumDir.LD: intendedPosY++; intendedPosX--; break;
                 case EnumDir.LL: intendedPosX--; break;
                 case EnumDir.LU: intendedPosY--; intendedPosX--; break;
-                case EnumDir.UU: intendedPosY--; break;
                 default: break;
             }
 
@@ -172,7 +172,7 @@ namespace PathFinding
                 return;
 
             // 중복 체크. openList에 등록이 되었지만 지금 경로가 더 좋다면 openList에 바꿔치기한다.
-            int tempG = parentNode.heuristic_g + ((int)dir % 2 == 0 ? (int)EnumDirWeight.DIAGONAL : (int)EnumDirWeight.CROSS);
+            int tempG = parentNode.heuristic_g + ((int)dir % 2 == 1 ? (int)EnumDirWeight.DIAGONAL : (int)EnumDirWeight.CROSS);
 
             int absX = Math.Abs(_endNode.xPos - intendedPosX);
             int absY = Math.Abs(_endNode.yPos - intendedPosY);
@@ -183,8 +183,6 @@ namespace PathFinding
 
             tempG *= (int)EnumDirWeight.G_WEIGHT;
             tempH *= (int)EnumDirWeight.H_WEIGHT;
-
-            int tempF = tempG + tempH;
 
 
             if (_openListDataSet.ContainsKey((intendedPosX, intendedPosY)))
@@ -199,7 +197,7 @@ namespace PathFinding
 
                         item.heuristic_g = tempG;
                         item.heuristic_h = tempH;
-                        item.heuristic_f = tempF;
+                        item.heuristic_f = tempG + tempH;
                     }
                 }
                 return;
@@ -213,7 +211,7 @@ namespace PathFinding
 
             newNode.heuristic_g = tempG;
             newNode.heuristic_h = tempH;
-            newNode.heuristic_f = tempF;
+            newNode.heuristic_f = tempG + tempH;
 
             _openList.Enqueue(newNode, newNode.heuristic_f);
             _openListDataSet.Add((newNode.xPos, newNode.yPos), newNode);

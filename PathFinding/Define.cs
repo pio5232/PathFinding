@@ -31,11 +31,12 @@ namespace PathFinding
         ASTAR = 0,
         JPS = 1,
     }
+
     enum EnumDirWeight
     {
-        CROSS = 10, // 상하좌우
+        CROSS = 10, // 상하좌우, manhattan
         DIAGONAL = 14, // 대각
-        
+
         H_WEIGHT = 2, // 기본 이동은 10의 값을 가진다 라고 설정.
         G_WEIGHT = 1,
     }
