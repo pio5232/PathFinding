@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Text;
+using System.Diagnostics;
 namespace PathFinding
 {
 
@@ -13,6 +14,7 @@ namespace PathFinding
         private int mouseOffsetX = 0;
         private int mouseOffsetY = 0;
 
+        PathFindType pathFindType = PathFindType.ASTAR;
         private Point prevMousePos;
 
         int cellSize;
@@ -23,10 +25,17 @@ namespace PathFinding
         bool bDrag = false;
         bool bErase = false;
         bool bEnd = false;
-        PathFinder pathFinder = new PathFinder();
 
-        Queue<(PathFindNode, EnumColor)> naviQ = new(3000); // y, x, color
+        Queue<(PathFindNode, EnumColor)> naviQ = new(3000); // y, x, color, for node
 
+        Queue<(int, int)> pathQ = new(3000); 
+        // 직접적으로 노드에 대한 정보는 담지 않는다.
+        // JPS에서 노드가 아닌 탐색 정보를 표시하기 위해서 사용한다.
+
+        AStarPathFinder astarPathFinder;//
+        JPSPathFinder jpsPathFinder;
+
+        PathFinder superPathFinder;
         System.Windows.Forms.Timer naviTimer = new System.Windows.Forms.Timer();
 
         const int defaultFontSize = 12;
@@ -44,6 +53,9 @@ namespace PathFinding
             this.SetStyle(ControlStyles.AllPaintingInWmPaint, true);
             this.SetStyle(ControlStyles.UserPaint, true);
 
+            astarPathFinder = new AStarPathFinder(naviQ);
+            jpsPathFinder = new(naviQ, pathQ);
+
             grid = new Grid[GridStandard.height, GridStandard.width];
 
             for (int i = 0; i < GridStandard.height; i++)
@@ -60,9 +72,8 @@ namespace PathFinding
             double changedMul = (double)big / small;
             cellSize = (int)(GridStandard.cellSize / changedMul);
 
-
             naviTimer.Tick += new EventHandler(Navigate);
-            naviTimer.Interval = 10;
+            naviTimer.Interval = 30;
 
             MouseWheel += new MouseEventHandler(MouseWheelEvent);
 
@@ -79,6 +90,8 @@ namespace PathFinding
 
             modeTb.Text = "Mode 1";
 
+            superPathFinder = astarPathFinder;
+            listBox1.SelectedIndex = 0;
         }
         private void MouseWheelEvent(object? sender, MouseEventArgs e)
         {
@@ -99,7 +112,13 @@ namespace PathFinding
         private void Navigate(object? sender, EventArgs e)
         {
             naviQ.Clear();
-            bool res = pathFinder.Navigate(naviQ);
+
+            bool res = false;
+
+            if (pathFindType == PathFindType.ASTAR)
+                res = astarPathFinder.Navigate();
+            else if (pathFindType == PathFindType.JPS)
+                res = jpsPathFinder.Navigate();
 
             textBox1.Text = naviQ.Count.ToString();
 
@@ -112,11 +131,23 @@ namespace PathFinding
                 grid[vTuple.Item1.yPos, vTuple.Item1.xPos].pathFindNode = vTuple.Item1;
             }
 
+            while (pathQ.Count > 0)
+            {
+                var vTuple = pathQ.Dequeue(); // item1 = x, item2 = y
+
+                //Debug.Assert(grid[vTuple.Item2, vTuple.Item1].Color == EnumColor.NO_USE);
+
+                //if(grid[vTuple.Item2, vTuple.Item1].Color == EnumColor.NO_USE)
+                if (grid[vTuple.Item2, vTuple.Item1].pathFindNode == null)
+                    grid[vTuple.Item2, vTuple.Item1].Color = EnumColor.JPS_SEARCH_PATH;
+            }
             if (res) // if successed return true
             {
                 bEnd = true;
                 naviTimer.Stop();
             }
+
+            //naviQ.Clear();
 
             Invalidate();
         }
@@ -147,6 +178,7 @@ namespace PathFinding
                         case EnumColor.END_SEARCH: color = Color.LightGray; break;
                         case EnumColor.PATH: color = Color.Yellow; break;
                         case EnumColor.PATH_NODE: color = Color.ForestGreen; break;
+                        case EnumColor.JPS_SEARCH_PATH: color = Color.SandyBrown; break;
                         default: break;
                     }
 
@@ -183,7 +215,6 @@ namespace PathFinding
 
         private void Form1_SizeChanged(object sender, EventArgs e)
         {
-
             int big = Width > Height ? Width : Height;
             int small = Width < Height ? Width : Height;
 
@@ -223,8 +254,8 @@ namespace PathFinding
             }
             else
             {
-                int xPos = ((e.Location.X - 200) + mouseOffsetX )/ cellSize;
-                int yPos = ((e.Location.Y + mouseOffsetY)/ cellSize); ;
+                int xPos = ((e.Location.X - 200) + mouseOffsetX) / cellSize;
+                int yPos = ((e.Location.Y + mouseOffsetY) / cellSize); ;
 
                 if (!GridStandard.IsRightPos(xPos, yPos))
                     return;
@@ -233,33 +264,33 @@ namespace PathFinding
                 {
                     if (e.Button == MouseButtons.Left)
                     {
-                        if (!pathFinder.StartNode.isUsable && grid[yPos, xPos].Color == EnumColor.NO_USE)
+                        if (!superPathFinder.StartNode.isUsable && grid[yPos, xPos].Color == EnumColor.NO_USE)
                         {
-                            pathFinder.StartNode.xPos = xPos;
-                            pathFinder.StartNode.yPos = yPos;
-                            pathFinder.StartNode.isUsable = true;
+                            superPathFinder.StartNode.xPos = xPos;
+                            superPathFinder.StartNode.yPos = yPos;
+                            superPathFinder.StartNode.isUsable = true;
 
                             grid[yPos, xPos].Color = EnumColor.START_POINT;
                         }
-                        else if (pathFinder.StartNode.isUsable && grid[yPos, xPos].Color == EnumColor.START_POINT)
+                        else if (superPathFinder.StartNode.isUsable && grid[yPos, xPos].Color == EnumColor.START_POINT)
                         {
-                            pathFinder.StartNode.isUsable = false;
+                            superPathFinder.StartNode.isUsable = false;
                             grid[yPos, xPos].Color = EnumColor.NO_USE;
                         }
                     }
 
                     else if (e.Button == MouseButtons.Right)
                     {
-                        if (!pathFinder.EndNode.isUsable && grid[yPos, xPos].Color == EnumColor.NO_USE)
+                        if (!superPathFinder.EndNode.isUsable && grid[yPos, xPos].Color == EnumColor.NO_USE)
                         {
-                            pathFinder.EndNode.xPos = xPos;
-                            pathFinder.EndNode.yPos = yPos;
-                            pathFinder.EndNode.isUsable = true;
+                            superPathFinder.EndNode.xPos = xPos;
+                            superPathFinder.EndNode.yPos = yPos;
+                            superPathFinder.EndNode.isUsable = true;
                             grid[yPos, xPos].Color = EnumColor.END_POINT;
                         }
-                        else if (pathFinder.EndNode.isUsable && grid[yPos, xPos].Color == EnumColor.END_POINT)
+                        else if (superPathFinder.EndNode.isUsable && grid[yPos, xPos].Color == EnumColor.END_POINT)
                         {
-                            pathFinder.EndNode.isUsable = false;
+                            superPathFinder.EndNode.isUsable = false;
                             grid[yPos, xPos].Color = EnumColor.NO_USE;
                         }
                     }
@@ -280,12 +311,12 @@ namespace PathFinding
                         if (!bErase)
                         {
                             grid[yPos, xPos].Color = EnumColor.OBSTACLE;
-                            pathFinder.InsertSetMember(xPos, yPos);
+                            superPathFinder.InsertSetMember(xPos, yPos);
                         }
                         else
                         {
                             grid[yPos, xPos].Color = EnumColor.NO_USE;
-                            pathFinder.DeleteSetMember(xPos, yPos);
+                            superPathFinder.DeleteSetMember(xPos, yPos);
                         }
                     }
                 }
@@ -301,8 +332,8 @@ namespace PathFinding
                 if (mode != EnumMode.BLOCKING || !bDrag)
                     return;
 
-                int xPos = ((e.Location.X - 200) + mouseOffsetX)/ cellSize;
-                int yPos = ((e.Location.Y +mouseOffsetY)/ cellSize);
+                int xPos = ((e.Location.X - 200) + mouseOffsetX) / cellSize;
+                int yPos = ((e.Location.Y + mouseOffsetY) / cellSize);
 
                 if (!GridStandard.IsRightPos(xPos, yPos))
                     return;
@@ -319,7 +350,7 @@ namespace PathFinding
                         return;
 
                     grid[yPos, xPos].Color = EnumColor.OBSTACLE;
-                    pathFinder.InsertSetMember(xPos, yPos);
+                    superPathFinder.InsertSetMember(xPos, yPos);
                 }
                 else
                 {
@@ -327,7 +358,7 @@ namespace PathFinding
                         return;
 
                     grid[yPos, xPos].Color = EnumColor.NO_USE;
-                    pathFinder.DeleteSetMember(xPos, yPos);
+                    superPathFinder.DeleteSetMember(xPos, yPos);
                 }
             }
             else // Move
@@ -339,7 +370,7 @@ namespace PathFinding
                 mouseOffsetY += prevMousePos.Y - e.Y;
 
                 prevMousePos = e.Location;
-                
+
             }
             Invalidate();
         }
@@ -364,19 +395,19 @@ namespace PathFinding
         {
             if (e.KeyCode == Keys.Space)
             {
-                if (!bEnd && !naviTimer.Enabled && pathFinder.CanNavi())
+                if (!bEnd && !naviTimer.Enabled && superPathFinder.CanNavi())
                 {
-                    naviTimer.Start();
+                     naviTimer.Start();
                 }
             }
-            else if(e.KeyCode == Keys.V)
+            else if (e.KeyCode == Keys.V)
             {
-                if (bEnd || !pathFinder.CanNavi())
+                if (bEnd || !superPathFinder.CanNavi())
                     return;
 
                 while (true)
                 {
-                    bool res = pathFinder.Navigate(naviQ);
+                    bool res = superPathFinder.Navigate();
 
                     while (naviQ.Count > 0)
                     {
@@ -398,30 +429,35 @@ namespace PathFinding
             // ESC, Delete
             else if (e.KeyCode == Keys.Escape)
             {
-                if (naviTimer.Enabled)
-                    naviTimer.Stop();
-
-                pathFinder.Initialize();
-
-                for (int i = 0; i < grid.GetLength(0); i++)
-                {
-                    for (int j = 0; j < grid.GetLength(1); j++)
-                    {
-                        grid[i, j].Color = EnumColor.NO_USE;
-                        grid[i, j].PathFindNode = null;
-                    }
-                }
-
-                mouseOffsetX = 0;
-                mouseOffsetY = 0;
-
-                bEnd = false;
-                Invalidate();
+                AllDataReset();
             }
-            else if(e.KeyCode == Keys.B)
+            else if (e.KeyCode == Keys.B)
             {
                 button1_Click(sender, e);
             }
+        }
+
+        private void AllDataReset()
+        {
+            if (naviTimer.Enabled)
+                naviTimer.Stop();
+
+            superPathFinder.Initialize();
+
+            for (int i = 0; i < grid.GetLength(0); i++)
+            {
+                for (int j = 0; j < grid.GetLength(1); j++)
+                {
+                    grid[i, j].Color = EnumColor.NO_USE;
+                    grid[i, j].PathFindNode = null;
+                }
+            }
+
+            mouseOffsetX = 0;
+            mouseOffsetY = 0;
+
+            bEnd = false;
+            Invalidate();
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -437,6 +473,20 @@ namespace PathFinding
                 isBtn1Clicked = true;
 
                 button1.Text = "Move On";
+            }
+        }
+
+        private void listBox1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            pathFindType = (PathFindType)listBox1.SelectedIndex;
+
+            AllDataReset();
+
+            switch(pathFindType)
+            {
+                case PathFindType.ASTAR: testTB.Text = "A*"; superPathFinder = astarPathFinder; break;
+                case PathFindType.JPS: testTB.Text = "JPS"; superPathFinder = jpsPathFinder;  break;
+                default:break;
             }
         }
     }

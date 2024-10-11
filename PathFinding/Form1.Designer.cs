@@ -28,10 +28,14 @@
         /// </summary>
         private void InitializeComponent()
         {
+            components = new System.ComponentModel.Container();
             button1 = new Button();
             textBox1 = new TextBox();
             manualTb = new TextBox();
             modeTb = new TextBox();
+            listBox1 = new ListBox();
+            contextMenuStrip1 = new ContextMenuStrip(components);
+            testTB = new TextBox();
             SuspendLayout();
             // 
             // button1
@@ -74,11 +78,38 @@
             modeTb.Size = new Size(161, 82);
             modeTb.TabIndex = 4;
             // 
+            // listBox1
+            // 
+            listBox1.FormattingEnabled = true;
+            listBox1.Items.AddRange(new object[] { "A*", "JPS" });
+            listBox1.Location = new Point(12, 669);
+            listBox1.Name = "listBox1";
+            listBox1.Size = new Size(161, 132);
+            listBox1.TabIndex = 5;
+            listBox1.TabStop = false;
+            listBox1.SelectedIndexChanged += listBox1_SelectedIndexChanged;
+            // 
+            // contextMenuStrip1
+            // 
+            contextMenuStrip1.ImageScalingSize = new Size(32, 32);
+            contextMenuStrip1.Name = "contextMenuStrip1";
+            contextMenuStrip1.Size = new Size(61, 4);
+            // 
+            // testTB
+            // 
+            testTB.Location = new Point(12, 822);
+            testTB.Multiline = true;
+            testTB.Name = "testTB";
+            testTB.Size = new Size(161, 135);
+            testTB.TabIndex = 7;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(14F, 32F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(2298, 1221);
+            Controls.Add(testTB);
+            Controls.Add(listBox1);
             Controls.Add(modeTb);
             Controls.Add(manualTb);
             Controls.Add(textBox1);
@@ -103,5 +134,8 @@
         private TextBox textBox1;
         private TextBox manualTb;
         private TextBox modeTb;
+        private ListBox listBox1;
+        private ContextMenuStrip contextMenuStrip1;
+        private TextBox testTB;
     }
 }

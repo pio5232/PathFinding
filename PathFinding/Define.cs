@@ -25,12 +25,18 @@ namespace PathFinding
             return true;
         }
     }
-    enum DirWeight
+
+    enum PathFindType
+    {
+        ASTAR = 0,
+        JPS = 1,
+    }
+    enum EnumDirWeight
     {
         CROSS = 10, // 상하좌우
         DIAGONAL = 14, // 대각
         
-        H_WEIGHT = 3, // 기본 이동은 10의 값을 가진다 라고 설정.
+        H_WEIGHT = 2, // 기본 이동은 10의 값을 가진다 라고 설정.
         G_WEIGHT = 1,
     }
     enum EnumMode
@@ -49,22 +55,41 @@ namespace PathFinding
         END_SEARCH,            // 5, 갔던 곳
         PATH,                  // 6, 경로
         PATH_NODE,                  // 7. 중간 경로 노드
+
+        JPS_SEARCH_PATH, // 8. JPS에서 노드로 등록되진 않았지만, 이미 탐색한 길.
         COLOR_MAX,
     };
 
     // 1시부터 시계방향
     enum EnumDir
     {
-        RU = 0, // ↗
+        // ----- ASTAR & JPS_ARRAY-----
+        UU = 0,      // ↑
+        RU,      // ↗
         RR,      // →
         RD,      // ↘
         DD,      // ↓
         LD,      // ↙
         LL,      // ←
         LU,      // ↖
-        UU,      // ↑
         DIR_MAX,     // 
+
+        // ----- JPS -----
+
+        JPS_UU = 0b_0000_0001, // ↑
+        JPS_RU = 0b_0000_0010, // ↗
+        JPS_RR = 0b_0000_0100, // →
+        JPS_RD = 0b_0000_1000, // ↘
+        JPS_DD = 0b_0001_0000, // ↓
+        JPS_LD = 0b_0010_0000, // ↙
+        JPS_LL = 0b_0100_0000, // ←
+        JPS_LU = 0b_1000_0000, // ↖
+
+        JPS_DIR_MAX = 8,
+        JPS_ALL_DIR = 0b_1111_1111,
+        JPS_NONE = 0b_0000_0000,
     };
+    
 
     class Grid
     {
