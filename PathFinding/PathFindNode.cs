@@ -24,21 +24,20 @@ namespace PathFinding
         public PathFindNode EndNode => _endNode;
 
         protected PriorityQueue<PathFindNode, int> _openList = new PriorityQueue<PathFindNode, int>(300, new HeuristicComparer());
-        protected Dictionary<(int, int), PathFindNode> _openListDataSet = new(3000); // 검색 속도를 빠르게 하기 위해서 O(1) 테이블 사용.
+        //protected Dictionary<(int, int), PathFindNode> _openListDataSet = new(3000); // 검색 속도를 빠르게 하기 위해서 O(1) 테이블 사용.
 
         protected HashSet<(int, int)> _closedSet = new(3050); // (xPos, yPos) << 내가 (y,x)의 형태로 사용하는데, 여기는 반대로 저장함.
 
-        protected Queue<(PathFindNode, EnumColor)> _colorQ;
-        // CloseList 존재해야하지만, 현재 grid의 색상을 통해 CloseList로 검사하는 역할을 할 수 있음.
+        protected Grid[,] _grid;
 
-        public PathFinder(Queue<(PathFindNode, EnumColor)> colorQ) { _colorQ = colorQ; }
-        public void InsertSetMember(int xPos, int yPos)
+        public PathFinder(Grid[,] grid ) { _grid = grid; }
+        public void InsertClosedSetMember(int xPos, int yPos)
         {
             Debug.Assert(_closedSet.Contains((xPos, yPos)) == false);
             _closedSet.Add((xPos, yPos));
         }
 
-        public void DeleteSetMember(int xPos, int yPos)
+        public void DeleteClosedSetMember(int xPos, int yPos)
         {
             Debug.Assert(_closedSet.Contains((xPos, yPos)));
             _closedSet.Remove((xPos, yPos));
@@ -51,7 +50,7 @@ namespace PathFinding
 
         public void Initialize()
         {
-            _openListDataSet.Clear();
+            //_openListDataSet.Clear();
 
             _openList.Clear();
             _closedSet.Clear();
@@ -67,12 +66,28 @@ namespace PathFinding
         public abstract bool CanNavi(); // Check Before Start
         public abstract bool Navigate();
 
+        Queue<(int, int, EnumColor)> _logQueue = new(2000); // [y,x]의 형태로 저장
+        protected void SetGrid(int x, int y, PathFindNode? node, EnumColor color)
+        {
+            if(color != EnumColor.JPS_SEARCH_PATH)
+            _logQueue.Enqueue((y, x, color));
+            
+            _grid[y, x].enumColor = color;
 
+            _grid[y, x].pathFindNode = node; 
+        }
+
+        protected bool IsGridBlocked(int x,int y)
+        {
+            return _grid[y, x].enumColor == EnumColor.OBSTACLE;
+            // return _closedSet.Contains((x, y));
+            //return _grid[y, x].enumColor != EnumColor.NO_USE;
+        }
     }
     class AStarPathFinder : PathFinder
     {
         protected override void InitializeEach() { }
-        public AStarPathFinder(Queue<(PathFindNode, EnumColor)> colorQ) : base(colorQ) { }
+        public AStarPathFinder(Grid[,] grid) : base(grid) { }
         public override bool CanNavi() // Check Before Start
         {
             if (!_startNode.isUsable || !_endNode.isUsable)
@@ -93,8 +108,6 @@ namespace PathFinding
                 _startNode.heuristic_h *= (int)EnumDirWeight.H_WEIGHT;
                 _startNode.heuristic_f = _startNode.heuristic_h;
                 _openList.Enqueue(_startNode, _startNode.heuristic_f);
-                //openList.Add(startNode);
-                _openListDataSet.Add((_startNode.xPos, _startNode.yPos), _startNode);
 
                 return true;
             }
@@ -105,35 +118,29 @@ namespace PathFinding
         {
              Debug.Assert(_openList.Count > 0);
 
-            //openList.Sort((PathFindNode first, PathFindNode second) => {
-            //    if(first.heuristic_f != second.heuristic_f)
-            //    return first.heuristic_f - second.heuristic_f;
-
-            //    return first.heuristic_h - second.heuristic_h;
-            //});
-
-            PathFindNode node = _openList.Dequeue();
-            //openList[0];
-            //openList.RemoveAt(0);
-
-            // closeSet에 존재하지 않는데 openList에 있다 == 무조건 openListDataSet에 존재.
-            _openListDataSet.Remove((node.xPos, node.yPos));
+            PathFindNode node;
+            do
+            {
+                node = _openList.Dequeue();
+            }
+            while (_closedSet.Contains((node.xPos, node.yPos)));
+            
             _closedSet.Add((node.xPos, node.yPos));
 
-            _colorQ.Enqueue((node, EnumColor.END_SEARCH));
+            SetGrid(node.xPos, node.yPos, node, EnumColor.END_SEARCH);
             // 목적지 확인
             // 도착한 상태면 부모노드를 타고 가서 색을 바꿔준다.
-            if (node.xPos == EndNode.xPos && node.yPos == EndNode.yPos)
+            if (node.xPos == _endNode.xPos && node.yPos == _endNode.yPos)
             {
                 // 출발지,목적지 제외 색바꿔야함
                 while (node.parent_node != null)
                 {
-                    _colorQ.Enqueue((node, EnumColor.PATH));
+                    SetGrid(node.xPos,node.yPos, node, EnumColor.PATH);
                     node = node.parent_node;
                 }
 
-                _colorQ.Enqueue((_startNode, EnumColor.START_POINT));
-                _colorQ.Enqueue((_endNode, EnumColor.END_POINT));
+                SetGrid(_startNode.xPos, _startNode.yPos, _startNode, EnumColor.START_POINT);
+                SetGrid(_endNode.xPos, _endNode.yPos, _endNode, EnumColor.END_POINT);
 
                 return true;
             }
@@ -184,25 +191,6 @@ namespace PathFinding
             tempG *= (int)EnumDirWeight.G_WEIGHT;
             tempH *= (int)EnumDirWeight.H_WEIGHT;
 
-
-            if (_openListDataSet.ContainsKey((intendedPosX, intendedPosY)))
-            {
-                PathFindNode item = _openListDataSet[(intendedPosX, intendedPosY)];
-
-                if (item.yPos == intendedPosY && item.xPos == intendedPosX)
-                {
-                    if (item.heuristic_g > tempG)
-                    {
-                        item.parent_node = parentNode;
-
-                        item.heuristic_g = tempG;
-                        item.heuristic_h = tempH;
-                        item.heuristic_f = tempG + tempH;
-                    }
-                }
-                return;
-            }
-
             // 그것도 아니라면. 새로운 노드 생성 후 openList에 등록한다.
             PathFindNode newNode = new PathFindNode();
             newNode.parent_node = parentNode;
@@ -214,120 +202,22 @@ namespace PathFinding
             newNode.heuristic_f = tempG + tempH;
 
             _openList.Enqueue(newNode, newNode.heuristic_f);
-            _openListDataSet.Add((newNode.xPos, newNode.yPos), newNode);
-            //openList.Add(newNode);
 
-            _colorQ.Enqueue((newNode, EnumColor.INTENDED));
+            SetGrid(newNode.xPos, newNode.yPos, newNode, EnumColor.INTENDED);
         }
     }
 
     class JPSPathFinder : PathFinder
     {
-        private Queue<(int, int)> _pathQ;
-        string s = new string("");
+        public JPSPathFinder(Grid[,] grid)
+            : base(grid) { }
 
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-
-        static int EnumToIdx(int jpsEnum)
-        {
-            switch(jpsEnum)
-            {
-                case (int)EnumDir.JPS_UU: return (int)EnumDir.UU;
-                case (int)EnumDir.JPS_RU: return (int)EnumDir.RU;
-                case (int)EnumDir.JPS_RR: return (int)EnumDir.RR;
-                case (int)EnumDir.JPS_RD: return (int)EnumDir.RD;
-                case (int)EnumDir.JPS_DD: return (int)EnumDir.DD;
-                case (int)EnumDir.JPS_LD: return (int)EnumDir.LD;
-                case (int)EnumDir.JPS_LL: return (int)EnumDir.LL;
-                case (int)EnumDir.JPS_LU: return (int)EnumDir.LU;
-                default: return (int)EnumDir.JPS_NONE;
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static EnumDir IdxToEnum(EnumDir jpsEnum)
-        {
-            switch (jpsEnum)
-            {
-                case EnumDir.UU: return EnumDir.JPS_UU;
-                case EnumDir.RU: return EnumDir.JPS_RU;
-                case EnumDir.RR: return EnumDir.JPS_RR;
-                case EnumDir.RD: return EnumDir.JPS_RD;
-                case EnumDir.DD: return EnumDir.JPS_DD;
-                case EnumDir.LD: return EnumDir.JPS_LD;
-                case EnumDir.LL: return EnumDir.JPS_LL;
-                case EnumDir.LU: return EnumDir.JPS_LU;
-                default: return EnumDir.JPS_NONE;
-            }
-        }
-        static readonly Point[] jpsDirs = {
-            new (0, -1), // ↑
-            new (1, -1), // ↗
-            new (1, 0 ), // →
-            new (1,1 ), // ↘
-            new (0, 1),// ↓
-            new ( -1, 1),// ↙
-            new ( -1, 0),// ←
-            new ( -1,-1)// ↖
-            }; // 그 방향에 대한 증감치
-
-
-        // 코너를 발견하기 위해서 탐색해야하는 방향의 값을 저장
-        // 방향당 2개씩 존재한다. 2*dir, 2*dir+1
-        static readonly Point[] jpsSearchX =
-        {
-            // 시계 방향으로 계산
-            // UU 기준 코너를 발견하기 위해서는
-            // -1,0 -> -1,-1 이 왼쪽 코너, 1,0 -> 1,-1이 오른쪽 코너
-            // 그렇기에 왼쪽 코너 / 오른쪽 코너 계산 식을 넣음.
-            new (-1, -1), new(1, 1),  // ↑ 
-            new (-1, -1), new(0, 1),// ↗
-            new (0, 1), new(0,1),  // →
-            new (0, 1), new(-1, -1),  // ↘
-            new (1, 1), new(-1, -1),  // ↓
-            new (1, 1), new(0, -1),// ↙
-            new (0, -1), new(0, -1),// ←
-            new (0,-1), new(1,1) // ↖
-        };
-        static readonly Point[] jpsSearchY =
-        {
-            // 시계 방향으로 계산/
-            new (0, -1), new(0,-1),  // ↑
-            new (0, -1), new(1, 1),  // ↗
-            new (-1, -1),new(1, 1),  // →
-            new (-1, -1), new(0, 1),  // ↘
-            new (0, 1), new(0,1),  // ↓
-            new (0, 1), new(-1, -1),// ↙
-            new (1, 1), new(-1, -1),// ←
-            new (1,1), new(0, -1) // ↖
-        };
-        private bool isEnd = false;
-        class SearchInfo
-        {
-            public int parentJpsDir = (int)EnumDir.JPS_NONE;
-            public int jpsDir = (int)EnumDir.JPS_NONE;
-            public int startXPos = -1;
-            public int startYPos = -1;
-        }
-
-        public JPSPathFinder(Queue<(PathFindNode, EnumColor)> colorQ, Queue<(int, int)> pathQ)
-            : base(colorQ) { _pathQ = pathQ; }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool IsEndPos(int x, int y)
-        {
-            bool ret = x == EndNode.xPos && y == EndNode.yPos;
-
-            if (ret)
-                isEnd = true;
-
-            return ret;
-        }
         protected override void InitializeEach()
         {
-            isEnd = false;
+            return;
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override bool CanNavi() // Check Before Start
         {
             if (!_startNode.isUsable || !_endNode.isUsable)
@@ -348,47 +238,11 @@ namespace PathFinding
 
                 _startNode.jpsDir = EnumDir.JPS_ALL_DIR;
 
-                //for(EnumDir idx = EnumDir.UU; idx < EnumDir.DIR_MAX; idx++)
-                //{
-                //    EnumDir jpsDir = IdxToEnum(idx);
-
-                //    PathFindNode newNode = new ();
-                //    newNode.parent_node = _startNode;
-
-                //    newNode.xPos = _startNode.xPos + jpsDirs[(int)idx].X;
-                //    newNode.yPos = _startNode.yPos + jpsDirs[(int)idx].Y;
-
-                //    absY = Math.Abs(_endNode.yPos - newNode.yPos);
-                //    absX = Math.Abs(_endNode.xPos - newNode.xPos);
-
-                //    large = absX > absY ? absX : absY;
-                //    small = absX < absY ? absX : absY;
-
-                //    newNode.heuristic_h = (small * (int)EnumDirWeight.DIAGONAL + (large - small) * (int)EnumDirWeight.CROSS)*(int)EnumDirWeight.H_WEIGHT;
-
-                //    absY = Math.Abs(_startNode.yPos - newNode.yPos);
-                //    absX = Math.Abs(_startNode.xPos - newNode.xPos);
-
-                //    large = absX > absY ? absX : absY;
-                //    small = absX < absY ? absX : absY;
-
-                //    newNode.heuristic_g =  (small * (int)EnumDirWeight.DIAGONAL + (large - small) * (int)EnumDirWeight.CROSS)*(int)EnumDirWeight.G_WEIGHT;
-                //    newNode.heuristic_f = newNode.heuristic_g + newNode.heuristic_h;
-
-                //    newNode.jpsDir = jpsDir;
-                //    _openList.Enqueue(newNode, newNode.heuristic_f);
-                //    _openListDataSet.Add((newNode.xPos, newNode.yPos), newNode);
-
-                //    _colorQ.Enqueue((newNode, EnumColor.INTENDED));
-                //}
                 _openList.Enqueue(_startNode, _startNode.heuristic_f);
-                _openListDataSet.Add((_startNode.xPos, _startNode.yPos), _startNode);
 
                 // 처음 시작할 때 8방향에 대해서 8개의 노드를 생성하도록 한다.
-
-                //_closedSet.Add((_startNode.xPos, _startNode.yPos));
-
-                //_colorQ.Enqueue((_startNode, EnumColor.END_SEARCH));
+                
+                // JPS에서는 맵 테두리에에 장애물을 설치한다.
 
                 return true;
             }
@@ -396,182 +250,538 @@ namespace PathFinding
         }
         public override bool Navigate()
         {
-            if (isEnd)
+             Debug.Assert(_openList.Count > 0);
+
+            PathFindNode node;
+
+            do
             {
-                PathFindNode pathNode = _endNode;
-                while (pathNode.parent_node != null)
+                node = _openList.Dequeue();
+            } while (_closedSet.Contains((node.xPos, node.yPos)));
+
+            _closedSet.Add((node.xPos, node.yPos));
+            
+            SetGrid(node.xPos, node.yPos, node, EnumColor.END_SEARCH);
+            
+            return Search(node);
+
+        }
+
+        bool Search(PathFindNode node)
+        {
+            if(node.xPos == _endNode.xPos && node.yPos == _endNode.yPos)
+            {
+                while (node.parent_node != null)
                 {
-                    _colorQ.Enqueue((pathNode, EnumColor.PATH));
-                    pathNode = pathNode.parent_node;
+                    SetGrid(node.xPos, node.yPos, node, EnumColor.PATH);
+                    node = node.parent_node;
                 }
 
-                _colorQ.Enqueue((_startNode, EnumColor.START_POINT));
-                _colorQ.Enqueue((_endNode, EnumColor.END_POINT));
+                SetGrid(_startNode.xPos, _startNode.yPos, _startNode, EnumColor.START_POINT);
+                SetGrid(_endNode.xPos, _endNode.yPos, _endNode, EnumColor.END_POINT);
 
                 return true;
             }
-
-            Debug.Assert(_openList.Count > 0);
-
-            PathFindNode node = _openList.Dequeue();
-
-            _openListDataSet.Remove((node.xPos, node.yPos));
-
-            _closedSet.Add((node.xPos, node.yPos));
-
-            _colorQ.Enqueue((node, EnumColor.END_SEARCH));
-
-            Search(node);
-
-            return false;
-        }
-
-    void Search(PathFindNode node)
-        {
             // Search란? 자신의 방향으로 탐색 (노드 생성이 가능하거나 벽에 막혀있으면 그 방향은 탐색 종료.)
             int jpsDir = (int)node.jpsDir;
 
-            SearchInfo searchInfo = new ();
             for (int i = 0; i < (int)EnumDir.JPS_DIR_MAX; i++) // 8방향 처리.
             {
                 // UU (0b_0000_0001) -> LU (0b_1000_0000)
-                int iDir = (((int)EnumDir.JPS_UU) << i);                
+                int iDir = (((int)EnumDir.JPS_UU) << i);
 
                 if ((jpsDir & iDir) != 0)
-                {
-                    searchInfo.parentJpsDir = (int)EnumDir.JPS_NONE;
-                    searchInfo.jpsDir = iDir;
-                    searchInfo.startXPos = node.xPos;
-                    searchInfo.startYPos = node.yPos;
-
+                { 
+                    // Search + 방향에 대해서는 EnumDir.JPS~~~ 방향을 리턴한다. 대각 방향에서 추갇
                     switch ((EnumDir)iDir)
-                    {
-                        case EnumDir.JPS_UU:
-                        case EnumDir.JPS_RR:
-                        case EnumDir.JPS_DD:
-                        case EnumDir.JPS_LL:
-                            SearchCross(node, searchInfo); break;
-                        case EnumDir.JPS_RU:
-                        case EnumDir.JPS_RD:
-                        case EnumDir.JPS_LD:
-                        case EnumDir.JPS_LU:
-                            SearchDiagonal(node, searchInfo);break;
+                    {   
+                            // 수평 수직
+                        case EnumDir.JPS_UU: SearchUU(node, node.xPos, node.yPos); break;
+                        case EnumDir.JPS_RR: SearchRR(node, node.xPos, node.yPos); break;
+                        case EnumDir.JPS_DD: SearchDD(node, node.xPos, node.yPos); break;
+                        case EnumDir.JPS_LL: SearchLL(node, node.xPos, node.yPos); break;
+                            // 대각
+                        case EnumDir.JPS_RU: SearchRU(node, node.xPos, node.yPos); break;
+                        case EnumDir.JPS_RD: SearchRD(node, node.xPos, node.yPos); break;
+                        case EnumDir.JPS_LD: SearchLD(node, node.xPos, node.yPos); break;
+                        case EnumDir.JPS_LU: SearchLU(node, node.xPos, node.yPos); break;
                     }
+                }
+            }
+            return false;
+        }
+        private void SearchLD(PathFindNode parent, int curXPos, int curYPos)
+        {
+            int direction = (int)EnumDir.JPS_LD | (int)EnumDir.JPS_LL | (int)EnumDir.JPS_DD;
+
+            bool isCorner = false;
+
+            SearchLL(parent, curXPos, curYPos);
+            SearchDD(parent, curXPos, curYPos);
+
+            while (true)
+            {
+                if (EndNode.xPos == curXPos && EndNode.yPos == curYPos)
+                {
+                    RegistEndNode(parent);
+                    return;
+                }
+
+                curXPos -= 1;
+                curYPos += 1;
+
+                if (!GridStandard.IsRightPos(curXPos - 1, curYPos + 1) || IsGridBlocked(curXPos, curYPos))
+                    break;
+                if (SearchLL(null, curXPos, curYPos) || SearchDD(null, curXPos, curYPos))
+                {
+                    RegistNode(parent, curXPos, curYPos, (EnumDir)direction);
+                    break;
+                }
+
+
+                // 오른쪽 코너 체크
+                if (IsGridBlocked(curXPos +1, curYPos) && !IsGridBlocked(curXPos + 1, curYPos + 1))
+                {
+                    isCorner = true;
+                    direction |= (int)EnumDir.JPS_RD;
+                }
+
+                // 위쪽 코너 체크
+                if (IsGridBlocked(curXPos, curYPos -1) && !IsGridBlocked(curXPos - 1, curYPos - 1))
+                {
+                    isCorner = true;
+                    direction |= (int)EnumDir.JPS_LU;
+                }
+                SetGrid(curXPos, curYPos, null, EnumColor.JPS_SEARCH_PATH);
+
+                if (isCorner)
+                {
+                    RegistNode(parent, curXPos, curYPos, (EnumDir)direction);
+                    break;
+                }
+            }
+        }
+        private void SearchRD(PathFindNode parent, int curXPos, int curYPos)
+        {
+            int direction = (int)EnumDir.JPS_RD | (int)EnumDir.JPS_RR | (int)EnumDir.JPS_DD;
+
+            bool isCorner = false;
+
+            SearchRR(parent, curXPos, curYPos);
+            SearchDD(parent, curXPos, curYPos);
+
+            while (true)
+            {
+                if(EndNode.xPos == curXPos && EndNode.yPos == curYPos)
+                {
+                    RegistEndNode(parent);
+                    return;
+                }
+
+                curXPos += 1;
+                curYPos += 1;
+
+                if (!GridStandard.IsRightPos(curXPos + 1, curYPos + 1) || IsGridBlocked(curXPos, curYPos))
+                    break;
+
+                if (SearchRR(null, curXPos, curYPos) || SearchDD(null, curXPos, curYPos))
+                {
+                    RegistNode(parent, curXPos, curYPos, (EnumDir)direction);
+                    break;
+                }
+
+                // 위쪽 코너 체크
+                if (IsGridBlocked(curXPos, curYPos-1) && !IsGridBlocked(curXPos + 1, curYPos - 1))
+                {
+                    isCorner = true;
+                    direction |= (int)EnumDir.JPS_RU;
+                }
+
+                // 왼쪽 코너 체크
+                if (IsGridBlocked(curXPos-1, curYPos) && !IsGridBlocked(curXPos - 1, curYPos + 1))
+                {
+                    isCorner = true;
+                    direction |= (int)EnumDir.JPS_LD;
+                }
+                SetGrid(curXPos, curYPos, null, EnumColor.JPS_SEARCH_PATH);
+
+                if (isCorner)
+                {
+                    RegistNode(parent, curXPos, curYPos, (EnumDir)direction);
+                    break;
+                }
+            }
+        }
+        private void SearchRU(PathFindNode parent, int curXPos, int curYPos)
+        {
+            int direction = (int)EnumDir.JPS_RU | (int)EnumDir.JPS_RR | (int)EnumDir.JPS_UU;
+            
+            bool isCorner = false;
+
+            SearchRR(parent, curXPos, curYPos);
+            SearchUU(parent, curXPos, curYPos);
+
+            while (true)
+            {
+                if (EndNode.xPos == curXPos && EndNode.yPos == curYPos)
+                {
+                    RegistEndNode(parent); 
+                    return;
+                }
+
+                curXPos += 1;
+                curYPos -= 1;
+
+                if (!GridStandard.IsRightPos(curXPos + 1, curYPos - 1) || IsGridBlocked(curXPos, curYPos))
+                    break;
+
+                if (SearchRR(null, curXPos, curYPos) || SearchUU(null, curXPos, curYPos))
+                {
+                    RegistNode(parent, curXPos, curYPos, (EnumDir)direction);
+                    break;
+                }
+
+                // 위쪽 코너 체크
+                if (IsGridBlocked(curXPos - 1, curYPos) && !IsGridBlocked(curXPos - 1, curYPos - 1))
+                {
+                    isCorner = true;
+                    direction |= (int)EnumDir.JPS_LU;
+                }
+
+                // 오른쪽 코너 체크
+                if (IsGridBlocked(curXPos, curYPos + 1) && !IsGridBlocked(curXPos + 1, curYPos + 1))
+                {
+                    isCorner = true;
+                    direction |= (int)EnumDir.JPS_RD;
+                }
+                SetGrid(curXPos, curYPos, null, EnumColor.JPS_SEARCH_PATH);
+
+                if (isCorner)
+                {
+                    RegistNode(parent, curXPos, curYPos, (EnumDir)direction);
+                    break;
                 }
             }
         }
 
-        void SLog(SearchInfo searchInfo)
+        private void SearchLU(PathFindNode parent, int curXPos, int curYPos)
         {
-            if (searchInfo.parentJpsDir != (int)EnumDir.JPS_NONE)
-                s += " ";
+            int direction = (int)EnumDir.JPS_LU | (int)EnumDir.JPS_LL | (int)EnumDir.JPS_UU;
 
-            switch ((EnumDir)searchInfo.jpsDir)
+            bool isCorner = false;
+
+            SearchLL(parent, curXPos, curYPos);
+            SearchUU(parent, curXPos, curYPos);
+
+            while (true)
             {
-                case EnumDir.JPS_UU: s += string.Format("Up, 0b_0000_0001 [x : {0}, y : {1}]\n",searchInfo.startXPos, searchInfo.startYPos); break;
-                case EnumDir.JPS_RR: s += string.Format("Right, 0b_0000_0100 [x : {0}, y : {1}]\n", searchInfo.startXPos, searchInfo.startYPos); break;
-                case EnumDir.JPS_DD: s += string.Format("Down, 0b_0001_0000 [x : {0}, y : {1}]\n", searchInfo.startXPos, searchInfo.startYPos); break;
-                case EnumDir.JPS_LL: s += string.Format("Left, 0b_0100_0000 [x : {0}, y : {1}]\n", searchInfo.startXPos, searchInfo.startYPos); break;
-                case EnumDir.JPS_RU: s += string.Format("Right Up, 0b_0000_0010 [x : {0}, y : {1}]\n", searchInfo.startXPos, searchInfo.startYPos); break;
-                case EnumDir.JPS_RD: s += string.Format("Right Down, 0b_0000_1000 [x : {0}, y : {1}]\n", searchInfo.startXPos, searchInfo.startYPos); break;
-                case EnumDir.JPS_LD: s += string.Format("Left Down, 0b_0010_0000 [x : {0}, y : {1}]\n", searchInfo.startXPos, searchInfo.startYPos); break;
-                case EnumDir.JPS_LU: s += string.Format("Left Up, 0b_1000_0000 [x : {0}, y : {1}]\n", searchInfo.startXPos, searchInfo.startYPos); break;
-                default: break;
+                if (EndNode.xPos == curXPos && EndNode.yPos == curYPos)
+                {
+                    RegistEndNode(parent);
+                    return;
+                }
+
+                curXPos -= 1;
+                curYPos -= 1;
+                if (!GridStandard.IsRightPos(curXPos - 1, curYPos - 1) || IsGridBlocked(curXPos, curYPos))
+                    break;
+
+                if (SearchLL(null, curXPos, curYPos) || SearchUU(null, curXPos, curYPos))
+                {
+                    RegistNode(parent, curXPos, curYPos, (EnumDir)direction);
+                    break;
+                }
+
+
+                // 왼쪽 코너 체크
+                if (IsGridBlocked(curXPos, curYPos + 1) && !IsGridBlocked(curXPos - 1, curYPos + 1))
+                {
+                    isCorner = true;
+                    direction |= (int)EnumDir.JPS_LD;
+                }
+
+                // 위쪽 코너 체크
+                if (IsGridBlocked(curXPos + 1, curYPos) && !IsGridBlocked(curXPos + 1, curYPos - 1))
+                {
+                    isCorner = true;
+                    direction |= (int)EnumDir.JPS_RU;
+                }
+
+                SetGrid(curXPos, curYPos, null, EnumColor.JPS_SEARCH_PATH);
+
+                if (isCorner)
+                {
+                    RegistNode(parent, curXPos, curYPos, (EnumDir)direction);
+                    break;
+                }
             }
         }
+        private bool SearchLL(PathFindNode? parent, int curXPos, int curYPos)
+        {
+            // 수평, 수직에 대한 체크 로직은 현재 위치가 maxSize를 벗어나지 않거나, 막혀있지 않은 경우에 진행할 수 있도록 한다.
+            int direction = (int)EnumDir.JPS_LL;
+
+            bool isCorner = false;
+            while(!isCorner)
+            {
+                curXPos -= 1; // 좌측 이동.
+
+                // 코너를 탐색할 만큼의 공간이 없거나 막혀있다면 리턴.
+                if (!GridStandard.IsRightPos(curXPos -1, curYPos) || IsGridBlocked(curXPos, curYPos))
+                    break;
+
+                // 목적지이면 그냥 대각에서 파생됐을 경우는 그냥 결과만 return, Cross 탐색중이라면 목적지를 오픈 리스트에 집어넣는다.
+                if(EndNode.xPos == curXPos && EndNode.yPos == curYPos)
+                {
+                    RegistEndNode(parent);
+                    return true;
+                }
+                
+                // 위쪽 코너 체크
+                if (IsGridBlocked(curXPos, curYPos - 1) && !IsGridBlocked(curXPos - 1, curYPos - 1))
+                {
+                    direction |= (int)EnumDir.JPS_LU;
+                    isCorner = true;
+                }
+
+                // 아래쪽 코너 체크
+                if (IsGridBlocked(curXPos, curYPos + 1) && !IsGridBlocked(curXPos - 1, curYPos + 1))
+                {
+                    direction |= (int)EnumDir.JPS_LD;
+                    isCorner = true;
+                }
+
+                SetGrid(curXPos, curYPos, null, EnumColor.JPS_SEARCH_PATH);
+            }
+
+            if (isCorner && parent != null) // 대각 방향에서 파생된 것이 아니고. 방향이 Cross일 때.
+                RegistNode(parent, curXPos, curYPos, (EnumDir)direction);
+
+            return isCorner;
+        }
+
+        private bool SearchDD(PathFindNode? parent, int curXPos, int curYPos)
+        {
+            // 수평, 수직에 대한 체크 로직은 현재 위치가 maxSize를 벗어나지 않거나, 막혀있지 않은 경우에 진행할 수 있도록 한다.
+            int direction = (int)EnumDir.JPS_DD;
+            
+            bool isCorner = false;
+            while (!isCorner)
+            {
+                curYPos += 1; // 좌측 이동.
+
+                // 코너를 탐색할 만큼의 공간이 없거나 막혀있다면 리턴.
+                if (!GridStandard.IsRightPos(curXPos, curYPos+1) || IsGridBlocked(curXPos, curYPos))
+                    break;
+               
+                // 목적지이면 그냥 대각에서 파생됐을 경우는 그냥 결과만 return, Cross 탐색중이라면 목적지를 오픈 리스트에 집어넣는다.
+                if (EndNode.xPos == curXPos && EndNode.yPos == curYPos)
+                {
+                    RegistEndNode(parent);
+                    return true;
+                }
+
+                // 왼쪽 코너 체크
+                if (IsGridBlocked(curXPos-1, curYPos) && !IsGridBlocked(curXPos - 1, curYPos + 1))
+                {
+                    direction |= (int)EnumDir.JPS_LD;
+                    isCorner = true;
+                }
+
+                // 오른쪽 코너 체크
+                if (IsGridBlocked(curXPos+1, curYPos) && !IsGridBlocked(curXPos + 1, curYPos + 1))
+                {
+                    direction |= (int)EnumDir.JPS_RD;
+                    isCorner = true;
+                }
+                SetGrid(curXPos, curYPos, null, EnumColor.JPS_SEARCH_PATH);
+
+            }
+            if (isCorner && parent != null) // 대각 방향에서 파생된 것이 아니고. 방향이 Cross일 때.
+                RegistNode(parent, curXPos, curYPos, (EnumDir)direction);
+            return isCorner;
+        }
+
+        private bool SearchRR(PathFindNode? parent, int curXPos, int curYPos)
+        {
+            int direction = (int)EnumDir.JPS_RR;
+            bool isCorner = false;
+
+            while (!isCorner)
+            {
+                curXPos += 1; // 좌측 이동.
+
+                if (!GridStandard.IsRightPos(curXPos +1, curYPos) || IsGridBlocked(curXPos, curYPos))
+                    break;
+                
+                // 목적지이면 그냥 대각에서 파생됐을 경우는 그냥 결과만 return, Cross 탐색중이라면 목적지를 오픈 리스트에 집어넣는다.
+                if (EndNode.xPos == curXPos && EndNode.yPos == curYPos)
+                {
+                    RegistEndNode(parent);
+                    return true;
+                }
+
+                // 위쪽 코너 체크
+                if (IsGridBlocked(curXPos, curYPos - 1) && !IsGridBlocked(curXPos + 1, curYPos - 1))
+                {
+                    direction |= (int)EnumDir.JPS_RU;
+                    isCorner = true;
+                }
+
+                // 아래쪽 코너 체크
+                if (IsGridBlocked(curXPos, curYPos + 1) && !IsGridBlocked(curXPos + 1, curYPos + 1))
+                {
+                    direction |= (int)EnumDir.JPS_RD;
+                    isCorner = true;
+                }
+                SetGrid(curXPos, curYPos, null, EnumColor.JPS_SEARCH_PATH);
+
+            }
+            if (isCorner && parent != null) // 대각 방향에서 파생된 것이 아니고. 방향이 Cross일 때.
+                RegistNode(parent, curXPos, curYPos, (EnumDir)direction);
+
+            return isCorner;
+        }
+
+        private bool SearchUU(PathFindNode? parent, int curXPos, int curYPos)
+        {
+            // 수평, 수직에 대한 체크 로직은 현재 위치가 maxSize를 벗어나지 않거나, 막혀있지 않은 경우에 진행할 수 있도록 한다.
+            int direction = (int)EnumDir.JPS_UU;
+            bool isCorner = false;
+
+            while (!isCorner)
+            {
+                curYPos -= 1; // 좌측 이동.
+
+                // 코너를 탐색할 만큼의 공간이 없거나 막혀있다면 리턴.
+                if (!GridStandard.IsRightPos(curXPos, curYPos - 1) || IsGridBlocked(curXPos, curYPos))
+                    break;
+
+                // 목적지이면 그냥 대각에서 파생됐을 경우는 그냥 결과만 return, Cross 탐색중이라면 목적지를 오픈 리스트에 집어넣는다.
+                if (EndNode.xPos == curXPos && EndNode.yPos == curYPos)
+                {
+                    RegistEndNode(parent);
+                    return true;
+                }
+
+                // 왼쪽 코너 체크
+                if (IsGridBlocked(curXPos - 1, curYPos) && !IsGridBlocked(curXPos - 1, curYPos - 1))
+                {
+                    direction |= (int)EnumDir.JPS_LU;
+                    isCorner = true;
+                }
+
+                // 오른쪽 코너 체크
+                if (IsGridBlocked(curXPos + 1, curYPos) && !IsGridBlocked(curXPos + 1, curYPos - 1))
+                {
+                    direction |= (int)EnumDir.JPS_RU;
+                    isCorner = true;
+                }
+                SetGrid(curXPos, curYPos, null, EnumColor.JPS_SEARCH_PATH);
+
+            }
+            if (isCorner && parent != null) // 대각 방향에서 파생된 것이 아니고. 방향이 Cross일 때.
+                RegistNode(parent, curXPos, curYPos, (EnumDir)direction);
+
+            return isCorner;
+        }
+
         // 1.증감치를 알아야한다.
         // RR -> X++ / LL -> X-- / UU -> Y-- / DD -> Y++
 
         // 2. 코너 판단을 하기 위한 좌표 증감값을 알아야한다.
         // RR -> +-Y, X +1 / LL -> +-Y, X-1 / UU -> +-X, Y-1 / DD -> +-X, Y+1
 
-        bool SearchCross(PathFindNode parentNode, SearchInfo searchInfo)
-        {
-            if (isEnd)
-                return true;
+        //bool SearchCross(PathFindNode parentNode, SearchInfo searchInfo) // 부모 노드를 생성한 상태면 true / 부모 노드를 생성하지 않았으면 false
+        //{
+        //    if (isEnd)
+        //        return true;
 
-            bool isCorner = false;
+        //    bool isCorner = false;
 
-            int searchDir = EnumToIdx(searchInfo.jpsDir);
-            int searchIdx = searchDir * 2;
+        //    int searchDir = EnumToIdx(searchInfo.jpsDir);
+        //    int searchIdx = searchDir * 2;
 
-            int curXPos = searchInfo.startXPos; // start Position
-            int curYPos = searchInfo.startYPos;
+        //    int curXPos = searchInfo.startXPos; // start Position
+        //    int curYPos = searchInfo.startYPos;
 
-            int extraClockWiseLeftDir = searchInfo.jpsDir >> 1; // EnumDir 참고. 시계 방향이기 때문에 구조상 Shift 1번이면 가능
-            if ((extraClockWiseLeftDir & (int)EnumDir.JPS_ALL_DIR) == 0) // UU의 경우는 LU를 체크할 수가 없기 때문에 직접 할당.
-                extraClockWiseLeftDir = (int)EnumDir.JPS_LU;
+        //    bool isStartedFromParent = parentNode.xPos == curXPos && parentNode.yPos == curYPos;
 
-            while (true)
-            {
-                if (!GridStandard.IsRightPos(curXPos + jpsDirs[searchDir].X, curYPos + jpsDirs[searchDir].Y))
-                    break;
+        //    int extraClockWiseLeftDir = searchInfo.jpsDir >> 1; // EnumDir 참고. 시계 방향이기 때문에 구조상 Shift 1번이면 가능
+        //    if ((extraClockWiseLeftDir & (int)EnumDir.JPS_ALL_DIR) == 0) // UU의 경우는 LU를 체크할 수가 없기 때문에 직접 할당.
+        //        extraClockWiseLeftDir = (int)EnumDir.JPS_LU;
 
-                // TODO : LOG   
-                SLog(searchInfo);
+        //    SLog(searchInfo);
+            
+        //    while (true)
+        //    {
+        //        curXPos += jpsDirs[searchDir].X;
+        //        curYPos += jpsDirs[searchDir].Y;
+              
+        //        if (!GridStandard.IsRightPos(curXPos, curYPos) || isGridBlocked(curXPos, curYPos))
+        //            break;
 
-                if (IsEndPos(curXPos, curYPos))
-                {
-                    if (searchInfo.startXPos == parentNode.xPos && searchInfo.startYPos == parentNode.yPos)
-                        RegistNode(parentNode, curXPos, curYPos, EnumDir.JPS_NONE);
-                    else
-                    {
-                        int parentDir = (searchInfo.parentJpsDir == (int)EnumDir.JPS_LU) ?
-                            (searchInfo.parentJpsDir >> 1 | (int)EnumDir.JPS_UU) : (searchInfo.parentJpsDir >> 1 | searchInfo.parentJpsDir << 1);
+        //        // TODO : LOG   
 
-                        PathFindNode innerNode = RegistNode(parentNode, searchInfo.startXPos, searchInfo.startYPos, (EnumDir)parentDir);
+        //        if (IsEndPos(curXPos, curYPos))
+        //        {
+        //            if (isStartedFromParent)
+        //                RegistNode(parentNode, curXPos, curYPos, EnumDir.JPS_NONE);
+        //            else
+        //            {
+        //                int parentDir = (searchInfo.parentJpsDir == (int)EnumDir.JPS_LU) ?
+        //                    (searchInfo.parentJpsDir >> 1 | (int)EnumDir.JPS_UU) : (searchInfo.parentJpsDir >> 1 | searchInfo.parentJpsDir << 1);
 
-                        RegistNode(innerNode, curXPos, curYPos, EnumDir.JPS_NONE);
-                    }
-                    return true;
-                }
+        //                PathFindNode innerNode = RegistNode(parentNode, searchInfo.startXPos, searchInfo.startYPos, (EnumDir)parentDir);
 
-                // 시계 방향 기준 왼쪽
-                if (IsClosed(curXPos + jpsSearchX[searchIdx].X, curYPos + jpsSearchY[searchIdx].X) && 
-                    !IsClosed(curXPos + jpsSearchX[searchIdx].Y, curYPos + jpsSearchY[searchIdx].Y))
-                {
-                    isCorner = true;
+        //                RegistNode(innerNode, curXPos, curYPos, EnumDir.JPS_NONE);
+        //            }
+        //            return true;
+        //        }
 
-                    searchInfo.jpsDir |= extraClockWiseLeftDir;
-                }
-                // 시계 방향 기준 오른쪽
-                if (IsClosed(curXPos + jpsSearchX[searchIdx + 1].X, curYPos + jpsSearchY[searchIdx + 1].X)
-                    && !IsClosed(curXPos + jpsSearchX[searchIdx + 1].Y, curYPos + jpsSearchY[searchIdx + 1].Y))
-                {
-                    isCorner = true;
+        //        // 시계 방향 기준 왼쪽
+        //        if (isGridBlocked(curXPos + jpsSearchX[searchIdx].X, curYPos + jpsSearchY[searchIdx].X) &&
+        //            !isGridBlocked(curXPos + jpsSearchX[searchIdx].Y, curYPos + jpsSearchY[searchIdx].Y))
+        //        {
+        //            isCorner = true;
 
-                    searchInfo.jpsDir |= searchInfo.jpsDir << 1; // == extraClockWiseRightDir
-                }
+        //            searchInfo.jpsDir |= extraClockWiseLeftDir;
+        //        }
+        //        // 시계 방향 기준 오른쪽
+        //        if (isGridBlocked(curXPos + jpsSearchX[searchIdx + 1].X, curYPos + jpsSearchY[searchIdx + 1].X)
+        //            && !isGridBlocked(curXPos + jpsSearchX[searchIdx + 1].Y, curYPos + jpsSearchY[searchIdx + 1].Y))
+        //        {
+        //            isCorner = true;
 
-                if (isCorner == true)
-                    break;
+        //            searchInfo.jpsDir |= searchInfo.jpsDir << 1; // == extraClockWiseRightDir
+        //        }
 
-                _pathQ.Enqueue((curXPos, curYPos));
+        //        if (isCorner == true)
+        //            break;
 
-                curXPos += jpsDirs[searchDir].X;
-                curYPos += jpsDirs[searchDir].Y;
+        //        if(isStartedFromParent)
+        //        SetGrid(curXPos, curYPos, null, EnumColor.JPS_SEARCH_PATH);
+        //    }
 
-                if (IsClosed(curXPos, curYPos))
-                    break;
-            }
+        //    if (isCorner)
+        //    {
+        //        // 부모 노드에서 뻗어나온 Cross
+        //        if (isStartedFromParent)
+        //            RegistNode(parentNode, curXPos, curYPos, (EnumDir)searchInfo.jpsDir);
+        //        else // 대각선 방향으로 탐색하면서 뻗어나온 Cross
+        //        {
+        //            int parentDir = (searchInfo.parentJpsDir == (int)EnumDir.JPS_LU) ?
+        //                (searchInfo.parentJpsDir >> 1 | (int)EnumDir.JPS_UU) : (searchInfo.parentJpsDir >> 1 | searchInfo.parentJpsDir << 1);
 
-            if (isCorner)
-            {
-                if (searchInfo.startXPos == parentNode.xPos && searchInfo.startYPos == parentNode.yPos)
-                    RegistNode(parentNode, curXPos, curYPos, (EnumDir)searchInfo.jpsDir);
-                else
-                {
-                    int parentDir = (searchInfo.parentJpsDir == (int)EnumDir.JPS_LU) ?
-                        (searchInfo.parentJpsDir >> 1 | (int)EnumDir.JPS_UU) : (searchInfo.parentJpsDir >> 1 | searchInfo.parentJpsDir << 1);
+        //            RegistNode(parentNode, searchInfo.startXPos, searchInfo.startYPos, (EnumDir)parentDir);
 
-                    PathFindNode innerNode = RegistNode(parentNode, searchInfo.startXPos, searchInfo.startYPos, (EnumDir)parentDir);
+        //            //RegistNode(innerNode, curXPos, curYPos, (EnumDir)searchInfo.jpsDir);
+        //            return true;
+        //        }
+        //    }
 
-                    RegistNode(innerNode, curXPos, curYPos, (EnumDir)searchInfo.jpsDir);
-                }
-            }
-
-            return false;
-        }
+        //    return false;
+        //}
         // ex) Right -> ClosedSet에 좌표 확인 -> 없다가 있으면. 노드 생성한다.
         // 막혀있으면 true, 뚫려있으면 false를 리턴. 헷갈릴까봐 적어둔다.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -581,111 +791,123 @@ namespace PathFinding
             return _closedSet.Contains((xPos, yPos));
         }
 
-        void SearchDiagonal(PathFindNode parentNode, SearchInfo searchInfo)
+        //void SearchDiagonal(PathFindNode parentNode, SearchInfo searchInfo)
+        //{
+        //    if (isEnd)
+        //        return;
+
+        //    int curXPos = parentNode.xPos;
+        //    int curYPos = parentNode.yPos;
+
+        //    int searchDir = searchInfo.jpsDir;
+
+        //    int dirIdx = EnumToIdx(searchInfo.jpsDir); // inputDir을 사용해도 상관x
+        //    int searchIdx = dirIdx * 2;
+
+        //    // 대각 방향은 기본 3가지 (min, ... , max)라고 칭한다.
+        //    // 시계 방향 기준 왼쪽에 존재하는 기준은 min, 오른쪽에 존재하는 기준은 max이다.
+        //    // 왼쪽 코너일 때는 min >> 1, 오른쪽 코너일 때는 max << 1을 해준다.
+
+        //    int clockWiseLeftDir = searchInfo.jpsDir >> 1;
+        //    int extraClockWiseLeftDir;// 시계 방향 기준 Left Extra Direction
+
+        //    if (clockWiseLeftDir == (int)EnumDir.JPS_UU) // inputDir이 JPS_RU인 경우
+        //    {
+        //        extraClockWiseLeftDir = (int)EnumDir.JPS_LU;
+        //    }
+        //    else
+        //        extraClockWiseLeftDir = clockWiseLeftDir >> 1;
+
+        //    int clockWiseRightDir;
+        //    if (searchInfo.jpsDir == (int)EnumDir.JPS_LU) // inputDir이 JPS_LU인 경우
+        //    {
+        //        clockWiseRightDir = (int)EnumDir.JPS_UU;
+        //    }
+        //    else
+        //    {
+        //        clockWiseRightDir = searchInfo.jpsDir << 1;
+        //    }
+        //    int extraClockWiseRightDir = clockWiseRightDir << 1;
+        //    searchDir |= clockWiseLeftDir | clockWiseRightDir;
+
+        //    bool isCorner = false;
+
+        //    SearchInfo childSearchInfo = new()
+        //    {
+        //        parentJpsDir = searchInfo.jpsDir,
+        //        jpsDir = clockWiseLeftDir,
+        //        startXPos = curXPos,
+        //        startYPos = curYPos
+        //    };
+
+        //    SLog(searchInfo);
+            
+        //    while (true)
+        //    {
+        //        // 들어온 대각 기준 시계 방향 기준 좌측 / 우측 탐색
+
+        //        childSearchInfo.jpsDir = clockWiseLeftDir;
+        //        if (SearchCross(parentNode, childSearchInfo))
+        //            break;
+
+        //        childSearchInfo.jpsDir = clockWiseRightDir;
+        //        if (SearchCross(parentNode, childSearchInfo))
+        //            break;
+
+        //        curXPos += jpsDirs[dirIdx].X;
+        //        curYPos += jpsDirs[dirIdx].Y;
+
+        //        childSearchInfo.startXPos = curXPos;
+        //        childSearchInfo.startYPos = curYPos;
+        //        if (!GridStandard.IsRightPos(curXPos , curYPos) || isGridBlocked(curXPos,curYPos))
+        //            break;
+
+        //        if (IsEndPos(curXPos, curYPos))
+        //        {
+        //            RegistNode(parentNode, curXPos, curYPos, EnumDir.JPS_NONE);
+        //            return;
+        //        }
+        //        // RD Check
+        //        if (isGridBlocked(curXPos + jpsSearchX[searchIdx].X, curYPos + jpsSearchY[searchIdx].X)
+        //            && !isGridBlocked(curXPos + jpsSearchX[searchIdx].Y, curYPos + jpsSearchY[searchIdx].Y))
+        //        {
+        //            isCorner = true;
+
+        //            searchDir |= extraClockWiseLeftDir;
+        //        }
+        //        // LU Check
+        //        if (isGridBlocked(curXPos + jpsSearchX[searchIdx + 1].X, curYPos + jpsSearchY[searchIdx + 1].X)
+        //            && !isGridBlocked(curXPos + jpsSearchX[searchIdx + 1].Y, curYPos + jpsSearchY[searchIdx + 1].Y))
+        //        {
+        //            isCorner = true;
+
+        //            searchDir |= extraClockWiseRightDir;
+        //        }
+
+        //        if (isCorner == true)
+        //            break;
+
+        //        SetGrid(curXPos, curYPos, null, EnumColor.JPS_SEARCH_PATH);
+
+        //    }
+
+        //    if (isCorner)
+        //    {
+        //        RegistNode(parentNode, curXPos, curYPos, (EnumDir)searchDir);
+        //    }
+        //}
+
+        void RegistEndNode(PathFindNode? parentNode)
         {
-            if (isEnd)
+            if (parentNode == null)
                 return;
 
-            int curXPos = parentNode.xPos;
-            int curYPos = parentNode.yPos;
-
-            int searchDir = searchInfo.jpsDir;
-
-            int dirIdx = EnumToIdx(searchInfo.jpsDir); // inputDir을 사용해도 상관x
-            int searchIdx = dirIdx * 2;
-
-            // 대각 방향은 기본 3가지 (min, ... , max)라고 칭한다.
-            // 시계 방향 기준 왼쪽에 존재하는 기준은 min, 오른쪽에 존재하는 기준은 max이다.
-            // 왼쪽 코너일 때는 min >> 1, 오른쪽 코너일 때는 max << 1을 해준다.
-
-            int clockWiseLeftDir = searchInfo.jpsDir>> 1;
-            int extraClockWiseLeftDir;// 시계 방향 기준 Left Extra Direction
-
-            if (clockWiseLeftDir == (int)EnumDir.JPS_UU) // inputDir이 JPS_RU인 경우
-            {
-                extraClockWiseLeftDir = (int)EnumDir.JPS_LU;
-            }
-            else
-                extraClockWiseLeftDir = clockWiseLeftDir >> 1;
+            _endNode.parent_node = parentNode;
             
-            int clockWiseRightDir;
-            if(searchInfo.jpsDir == (int)EnumDir.JPS_LU) // inputDir이 JPS_LU인 경우
-            {
-                clockWiseRightDir = (int)EnumDir.JPS_UU;
-            }
-            else 
-            {
-                clockWiseRightDir = searchInfo.jpsDir << 1;
-            }
-            int extraClockWiseRightDir = clockWiseRightDir << 1;
-            searchDir |= clockWiseLeftDir | clockWiseRightDir;
+            _openList.Enqueue(_endNode, _endNode.heuristic_f);
 
-            bool isCorner = false;
-
-            SearchInfo childSearchInfo = new()
-            {
-                parentJpsDir = searchInfo.jpsDir,
-                jpsDir = clockWiseLeftDir,
-                startXPos = curXPos,
-                startYPos = curYPos
-            };
-
-            while (true)
-            {
-                if (!GridStandard.IsRightPos(curXPos + jpsDirs[dirIdx].X, curYPos + jpsDirs[dirIdx].Y))
-                    break;
-
-                SLog(searchInfo);
-                if (IsEndPos(curXPos, curYPos))
-                {
-                    RegistNode(parentNode, curXPos, curYPos, EnumDir.JPS_NONE);
-                    return;
-                }
-                // 들어온 대각 기준 시계 방향 기준 좌측 / 우측 탐색
-
-                childSearchInfo.jpsDir = clockWiseLeftDir;
-                SearchCross(parentNode, childSearchInfo);
-
-                childSearchInfo.jpsDir = clockWiseRightDir;
-                SearchCross(parentNode, childSearchInfo);
-
-                // RD Check
-                if (IsClosed(curXPos + jpsSearchX[searchIdx].X, curYPos + jpsSearchY[searchIdx].X)
-                    && !IsClosed(curXPos + jpsSearchX[searchIdx].Y, curYPos + jpsSearchY[searchIdx].Y))
-                {
-                    isCorner = true;
-
-                    searchDir |= extraClockWiseLeftDir;
-                }
-                // LU Check
-                if (IsClosed(curXPos + jpsSearchX[searchIdx + 1].X, curYPos + jpsSearchY[searchIdx + 1].X)
-                    && !IsClosed(curXPos + jpsSearchX[searchIdx + 1].Y, curYPos + jpsSearchY[searchIdx +1].Y))
-                {
-                    isCorner = true;
-
-                    searchDir |= extraClockWiseRightDir;
-                }
-
-                if (isCorner == true)
-                    break;
-                _pathQ.Enqueue((curXPos, curYPos));
-
-                curXPos += jpsDirs[dirIdx].X;
-                curYPos += jpsDirs[dirIdx].Y;
-
-                childSearchInfo.startXPos = curXPos;
-                childSearchInfo.startYPos = curYPos;
-
-                if (IsClosed(curXPos, curYPos))
-                    break;
-            }
-
-            if (isCorner)
-            {
-                RegistNode(parentNode, curXPos, curYPos, (EnumDir)searchDir);
-            }
+            SetGrid(_endNode.xPos, _endNode.yPos, _endNode, EnumColor.INTENDED);
         }
-
         PathFindNode RegistNode(PathFindNode? parentNode, int xPos, int yPos, EnumDir dir)
         {
             int absX = Math.Abs(_startNode.xPos - xPos);
@@ -700,24 +922,6 @@ namespace PathFinding
             small = absX < absY ? absX : absY;
             int tempH = (small * (int)EnumDirWeight.DIAGONAL + (large - small) * (int)EnumDirWeight.CROSS) * (int)EnumDirWeight.H_WEIGHT;
 
-            if (_openListDataSet.ContainsKey((xPos, yPos)))
-            {
-                PathFindNode item = _openListDataSet[(xPos, yPos)];
-
-                if (item.yPos == yPos && item.xPos == xPos)
-                {
-                    if (item.heuristic_g > tempG)
-                    {
-                        item.parent_node = parentNode;
-
-                        item.heuristic_g = tempG;
-                        item.heuristic_h = tempH;
-                        item.heuristic_f = tempG + tempH;
-                    }
-                }
-                return item;
-            }
-
             PathFindNode newNode = new()
             {
                 parent_node = parentNode,
@@ -731,13 +935,12 @@ namespace PathFinding
             };
 
             _openList.Enqueue(newNode, newNode.heuristic_f);
-            _openListDataSet.Add((xPos, yPos), newNode);
-            //openList.Add(newNode);
 
-            _colorQ.Enqueue((newNode, EnumColor.INTENDED));
+            SetGrid(newNode.xPos, newNode.yPos, newNode, EnumColor.INTENDED);
 
             return newNode;
         }
+
     }
     class PathFindNode
     {
